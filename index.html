@@ -6,355 +6,516 @@
   <title>Comunidade+ — App da Igreja</title>
   <meta name="theme-color" content="#4338CA" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Comunidade+" />
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%234338CA'/%3E%3Cstop offset='100%25' stop-color='%237C3AED'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='112' fill='url(%23bg)'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' fill='%23FFF' font-family='sans-serif' font-size='210' font-weight='800'%3EC+%3C/text%3E%3C/svg%3E" />
   <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
   <link rel="apple-touch-icon" href="icon.svg" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    body {
-      background-color: #F4F6FB;
-      color: #0F172A;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
-      margin: 0;
-      padding: 0;
-    }
-    .hide-scrollbar::-webkit-scrollbar { display: none; }
-    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    .hero-gradient { background: linear-gradient(135deg, #4338CA 0%, #5B50E6 55%, #7C3AED 100%); }
-    .pix-gradient { background: linear-gradient(135deg, #059669 0%, #10B981 100%); }
-    .safe-bottom { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
-    .safe-top { padding-top: max(0.75rem, env(safe-area-inset-top)); }
+    body { background: #F4F6FB; color: #0F172A; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif; margin: 0; }
+    .hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { scrollbar-width: none; }
+    .hero { background: linear-gradient(135deg, #4338CA 0%, #5B50E6 55%, #7C3AED 100%); }
+    .pix { background: linear-gradient(135deg, #059669 0%, #10B981 100%); }
+    .safe-b { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
+    .safe-t { padding-top: max(0.75rem, env(safe-area-inset-top)); }
   </style>
 </head>
 <body class="antialiased min-h-screen">
-  <div id="root" class="min-h-screen flex flex-col"></div>
-
-  <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 hidden max-w-xs w-[90%] bg-slate-900 text-white shadow-xl rounded-2xl px-4 py-3 text-xs font-medium flex items-center gap-2.5">
-    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0"></span>
-    <span id="toast-msg"></span>
-  </div>
-
+  <div id="root"></div>
+  <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 hidden w-[90%] max-w-xs bg-slate-900 text-white rounded-2xl px-4 py-3 text-xs font-medium shadow-xl"></div>
   <script>
     const PROFILES = {
-      evangelica: {
-        label: 'Igreja Evangélica', defaultName: 'Igreja Vida Nova', service: 'Culto', services: 'Cultos',
-        tithe: 'Dízimo', offering: 'Oferta', missions: 'Missões', groups: 'Células', leader: 'Pastor',
-        ministry: 'Ministério', prayer: 'Pedido de Oração', prayers: 'Pedidos de Oração',
-        verse: '“Porque onde estiverem dois ou três reunidos em meu nome, ali estou no meio deles.” — Mateus 18:20'
-      },
-      catolica: {
-        label: 'Paróquia Católica', defaultName: 'Paróquia São José', service: 'Missa', services: 'Missas',
-        tithe: 'Dízimo', offering: 'Oferta', missions: 'Ação Social', groups: 'Pastorais', leader: 'Padre',
-        ministry: 'Pastoral', prayer: 'Intenção de Oração', prayers: 'Intenções de Oração',
-        verse: '“O Senhor é o meu pastor, nada me faltará.” — Salmo 23:1'
-      },
-      generico: {
-        label: 'Templo / Genérico', defaultName: 'Comunidade Luz & Paz', service: 'Encontro', services: 'Encontros',
-        tithe: 'Contribuição', offering: 'Doação', missions: 'Projetos Sociais', groups: 'Grupos', leader: 'Liderança',
-        ministry: 'Equipe', prayer: 'Pedido de Apoio', prayers: 'Pedidos de Apoio',
-        verse: '“A união e o cuidado mútuo fortalecem toda a comunidade.”'
-      }
+      evangelica: { label: 'Igreja Evangélica', service: 'Culto', services: 'Cultos', tithe: 'Dízimo', offering: 'Oferta', missions: 'Missões', ministry: 'Ministério', prayer: 'Pedido de Oração', prayers: 'Pedidos de Oração', word: 'Palavra do Dia', verse: '“Porque onde estiverem dois ou três reunidos em meu nome, ali estou no meio deles.” — Mateus 18:20' },
+      catolica: { label: 'Paróquia Católica', service: 'Missa', services: 'Missas', tithe: 'Dízimo', offering: 'Oferta', missions: 'Ação Social', ministry: 'Pastoral', prayer: 'Intenção de Oração', prayers: 'Intenções de Oração', word: 'Liturgia do Dia', verse: '“O Senhor é o meu pastor, nada me faltará.” — Salmo 23:1' },
+      generico: { label: 'Templo / Genérico', service: 'Encontro', services: 'Encontros', tithe: 'Contribuição', offering: 'Doação', missions: 'Projetos Sociais', ministry: 'Equipe', prayer: 'Pedido de Apoio', prayers: 'Pedidos de Apoio', word: 'Reflexão do Dia', verse: '“A união e o cuidado mútuo fortalecem toda a comunidade.”' }
     };
+    const ROLES = {
+      admin: { label: 'Pastor / Admin', tabs: ['overview', 'members', 'finance', 'content', 'prayers', 'schedules', 'settings'] },
+      treasurer: { label: 'Tesouraria', tabs: ['overview', 'finance'] },
+      secretary: { label: 'Secretaria', tabs: ['overview', 'members', 'content'] },
+      leader: { label: 'Líder de Ministério', tabs: ['overview', 'schedules', 'prayers'] },
+      member: { label: 'Membro', tabs: [] }
+    };
+    const TAB_LABEL = { overview: 'Resumo', members: 'Membros', finance: 'Pix & Financeiro', content: 'Avisos & Eventos', prayers: 'Oração', schedules: 'Escalas', settings: 'Conta & Marca' };
+    const DB_KEY = 'cmp_db_v2', SS_KEY = 'cmp_session_v2';
 
-    const STORAGE_KEY = 'comunidade_plus_mobile_single_v1';
-
-    function getDefaultState() {
+    function seed() {
+      const c1 = 'c_vida', c2 = 'c_sj';
       return {
-        mode: 'member', memberTab: 'home', adminTab: 'overview', profileKey: 'evangelica',
-        churchName: 'Igreja Vida Nova', churchCnpj: '12.345.678/0001-90', churchCity: 'São Paulo',
-        dailyMessage: PROFILES.evangelica.verse, currentUser: 'Lucas Silva',
-        pixKey: 'financeiro@igrejavidanova.org.br', membersCount: 342,
+        churches: [
+          { id: c1, slug: 'vidanova', name: 'Igreja Vida Nova', cnpj: '12.345.678/0001-90', city: 'Volta Redonda', pixKey: 'financeiro@igrejavidanova.org.br', profile: 'evangelica', dailyMessage: PROFILES.evangelica.verse, joinMode: 'approval', plan: 'Essencial' },
+          { id: c2, slug: 'saojose', name: 'Paróquia São José', cnpj: '98.765.432/0001-10', city: 'Barra Mansa', pixKey: 'dizimo@paroquiasaojose.org.br', profile: 'catolica', dailyMessage: PROFILES.catolica.verse, joinMode: 'open', plan: 'Teste grátis' }
+        ],
+        users: [
+          { id: 'u_super', name: 'Raphael (Comunidade+)', email: 'admin@comunidademais.app', pass: '123456', isSuper: true },
+          { id: 'u_pr', name: 'Pr. André Souza', email: 'pastor@vidanova.org', pass: '123456' },
+          { id: 'u_tes', name: 'Marta Oliveira', email: 'tesouraria@vidanova.org', pass: '123456' },
+          { id: 'u_lid', name: 'Mariana Costa', email: 'mariana@email.com', pass: '123456' },
+          { id: 'u_fiel', name: 'Lucas Silva', email: 'lucas@email.com', pass: '123456' },
+          { id: 'u_ana', name: 'Ana Paula', email: 'ana@email.com', pass: '123456' },
+          { id: 'u_jp', name: 'João Pedro', email: 'joao@email.com', pass: '123456' },
+          { id: 'u_padre', name: 'Pe. Carlos', email: 'padre@saojose.org', pass: '123456' },
+          { id: 'u_rosa', name: 'Rosa Lima', email: 'rosa@email.com', pass: '123456' }
+        ],
+        memberships: [
+          { id: 'm1', churchId: c1, userId: 'u_pr', role: 'admin', status: 'active', ministry: 'Pastoral' },
+          { id: 'm2', churchId: c1, userId: 'u_tes', role: 'treasurer', status: 'active', ministry: 'Tesouraria' },
+          { id: 'm3', churchId: c1, userId: 'u_lid', role: 'leader', status: 'active', ministry: 'Louvor' },
+          { id: 'm4', churchId: c1, userId: 'u_fiel', role: 'member', status: 'active', ministry: 'Louvor' },
+          { id: 'm5', churchId: c1, userId: 'u_jp', role: 'member', status: 'active', ministry: 'Recepção' },
+          { id: 'm6', churchId: c1, userId: 'u_ana', role: 'member', status: 'pending', ministry: '' },
+          { id: 'm7', churchId: c2, userId: 'u_padre', role: 'admin', status: 'active', ministry: 'Pastoral' },
+          { id: 'm8', churchId: c2, userId: 'u_rosa', role: 'member', status: 'active', ministry: 'Liturgia' }
+        ],
         announcements: [
-          { id: 1, title: 'Inscrições abertas para o Batismo', body: 'Nosso próximo batismo será no domingo dia 07/12 às 10h. Faça sua inscrição na aba Agenda.', tag: 'Importante', date: 'Hoje, 09:30' },
-          { id: 2, title: 'Cesta Solidária de Natal', body: 'Estamos arrecadando alimentos não perecíveis para abençoar 80 famílias da região.', tag: 'Ação Social', date: 'Ontem' }
+          { id: 'a1', churchId: c1, title: 'Inscrições abertas para o Batismo', body: 'Nosso próximo batismo será no domingo, 07/12, às 10h. Inscreva-se na aba Agenda.', tag: 'Importante', date: 'Hoje, 09:30' },
+          { id: 'a2', churchId: c1, title: 'Cesta Solidária de Natal', body: 'Estamos arrecadando alimentos não perecíveis para abençoar 80 famílias da região.', tag: 'Ação Social', date: 'Ontem' },
+          { id: 'a3', churchId: c2, title: 'Novena de Natal', body: 'De 16 a 24/12, às 19h, na Igreja Matriz.', tag: 'Importante', date: 'Hoje' }
         ],
         events: [
-          { id: 101, title: 'Culto da Família', date: 'Domingo • 18:30', location: 'Templo Principal', spots: 250, registered: 148, userRegistered: true },
-          { id: 102, title: 'Noite de Louvor e Adoração', date: 'Quarta • 20:00', location: 'Auditório Central', spots: 120, registered: 64, userRegistered: false },
-          { id: 103, title: 'Encontro de Jovens — Conexão', date: 'Sábado • 19:30', location: 'Espaço Jovem', spots: 80, registered: 52, userRegistered: false }
+          { id: 'e1', churchId: c1, title: 'Culto da Família', date: 'Domingo • 18:30', location: 'Templo Principal', spots: 250, base: 148 },
+          { id: 'e2', churchId: c1, title: 'Noite de Louvor e Adoração', date: 'Quarta • 20:00', location: 'Auditório', spots: 120, base: 64 },
+          { id: 'e3', churchId: c1, title: 'Batismo', date: '07/12 • 10:00', location: 'Templo Principal', spots: 40, base: 22 },
+          { id: 'e4', churchId: c2, title: 'Missa Dominical', date: 'Domingo • 08:00', location: 'Igreja Matriz', spots: 300, base: 180 }
         ],
+        registrations: [{ eventId: 'e1', userId: 'u_fiel' }],
         schedules: [
-          { id: 201, event: 'Culto da Família — Dom 18:30', ministry: 'Louvor (Violão)', volunteer: 'Lucas Silva', status: 'pending' },
-          { id: 202, event: 'Noite de Louvor — Qua 20:00', ministry: 'Mídia & Projeção', volunteer: 'Lucas Silva', status: 'confirmed' },
-          { id: 203, event: 'Culto da Família — Dom 18:30', ministry: 'Recepção', volunteer: 'Mariana Costa', status: 'confirmed' }
+          { id: 's1', churchId: c1, userId: 'u_fiel', event: 'Culto da Família — Dom 18:30', ministry: 'Louvor (Violão)', status: 'pending' },
+          { id: 's2', churchId: c1, userId: 'u_fiel', event: 'Noite de Louvor — Qua 20:00', ministry: 'Mídia & Projeção', status: 'confirmed' },
+          { id: 's3', churchId: c1, userId: 'u_lid', event: 'Culto da Família — Dom 18:30', ministry: 'Louvor (Vocal)', status: 'confirmed' },
+          { id: 's4', churchId: c1, userId: 'u_jp', event: 'Culto da Família — Dom 18:30', ministry: 'Recepção', status: 'swap' }
         ],
         prayers: [
-          { id: 301, author: 'Ana Paula', text: 'Peço oração pela recuperação da cirurgia da minha mãe nesta semana.', isPrivate: false, status: 'praying', prayCount: 14, date: 'Hoje, 08:15' },
-          { id: 302, author: 'Anônimo', text: 'Direção para uma nova porta de emprego e paz para nossa família.', isPrivate: true, status: 'new', prayCount: 3, date: 'Ontem' }
+          { id: 'p1', churchId: c1, userId: 'u_lid', anon: false, text: 'Peço oração pela recuperação da cirurgia da minha mãe nesta semana.', isPrivate: false, status: 'praying', prayedBy: ['u_fiel', 'u_pr'], date: 'Hoje, 08:15' },
+          { id: 'p2', churchId: c1, userId: 'u_jp', anon: true, text: 'Direção para uma nova porta de emprego e paz para nossa família.', isPrivate: true, status: 'new', prayedBy: [], date: 'Ontem' }
         ],
         contributions: [
-          { id: 401, member: 'Carlos Eduardo', category: 'tithe', amount: 350, status: 'confirmed', date: 'Hoje, 09:10' },
-          { id: 402, member: 'Fernanda Lima', category: 'offering', amount: 120, status: 'confirmed', date: 'Ontem' },
-          { id: 404, member: 'João Pedro', category: 'tithe', amount: 500, status: 'pending_check', date: 'Hoje, 10:05' }
+          { id: 'k1', churchId: c1, userId: 'u_jp', category: 'tithe', amount: 500, status: 'pending_check', date: 'Hoje, 10:05', txid: 'CMP0001' },
+          { id: 'k2', churchId: c1, userId: 'u_lid', category: 'offering', amount: 120, status: 'confirmed', date: 'Ontem', txid: 'CMP0002' },
+          { id: 'k3', churchId: c2, userId: 'u_rosa', category: 'tithe', amount: 200, status: 'confirmed', date: 'Ontem', txid: 'CMP0003' }
         ],
-        pixFlow: { step: 'form', category: 'tithe', amount: 100, txid: '', payload: '', lastReceipt: null },
-        activityLog: [
-          { time: '10:05', text: 'João Pedro informou Pix direto de R$ 500,00 (aguardando conferência)' },
-          { time: '09:30', text: 'Novo aviso publicado: Inscrições abertas para o Batismo' }
+        activity: [
+          { id: 'l1', churchId: c1, time: '10:05', text: 'João Pedro informou Pix de R$ 500,00 (Dízimo)' },
+          { id: 'l2', churchId: c1, time: '09:50', text: 'Ana Paula pediu para entrar na igreja' }
         ]
       };
     }
 
-    let state = loadState();
-    function loadState() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const p = JSON.parse(raw);
-          return { ...getDefaultState(), ...p, pixFlow: { ...getDefaultState().pixFlow, ...(p.pixFlow || {}) } };
-        }
-      } catch (e) {}
-      return getDefaultState();
-    }
-    function saveState() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {} }
-    function t(k) { return PROFILES[state.profileKey][k] || k; }
-    function fmtCurrency(v) { return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
-    function nowTime() { return new Date().toTimeString().slice(0, 5); }
-    function logActivity(text) { state.activityLog.unshift({ time: nowTime(), text }); if (state.activityLog.length > 8) state.activityLog.pop(); }
-    function escapeHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function loadDB() { try { const r = localStorage.getItem(DB_KEY); if (r) return JSON.parse(r); } catch (e) {} return seed(); }
+    let db = loadDB();
+    let S = (() => { try { return JSON.parse(sessionStorage.getItem(SS_KEY)) || {}; } catch (e) { return {}; } })();
+    S = Object.assign({ userId: null, churchId: null, view: 'app', tab: 'home', adminTab: 'overview', authMode: 'login', pix: { step: 'form', category: 'tithe', amount: 100 } }, S);
+    const inviteParam = new URLSearchParams(location.search).get('igreja');
+    if (inviteParam) S.invite = inviteParam.toLowerCase();
+    function save() { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch (e) {} try { sessionStorage.setItem(SS_KEY, JSON.stringify(S)); } catch (e) {} }
 
-    let toastTimer = null;
-    function showToast(msg) {
-      const el = document.getElementById('toast');
-      document.getElementById('toast-msg').textContent = msg;
-      el.classList.remove('hidden');
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => el.classList.add('hidden'), 3000);
-    }
+    const $ = id => document.getElementById(id);
+    const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const money = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const hhmm = () => new Date().toTimeString().slice(0, 5);
+    const me = () => db.users.find(u => u.id === S.userId);
+    const church = () => db.churches.find(c => c.id === S.churchId);
+    const myMem = () => db.memberships.find(m => m.userId === S.userId && m.churchId === S.churchId);
+    const role = () => (myMem() || {}).role || 'member';
+    const can = tab => ROLES[role()].tabs.includes(tab);
+    const isStaff = () => ROLES[role()].tabs.length > 0;
+    const t = k => PROFILES[(church() || {}).profile || 'evangelica'][k] || k;
+    const uname = id => (db.users.find(u => u.id === id) || {}).name || '—';
+    const of = list => db[list].filter(x => x.churchId === S.churchId);
+    const initials = n => n.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || 'C+';
+    function log(text) { db.activity.unshift({ id: uid('l'), churchId: S.churchId, time: hhmm(), text }); db.activity = db.activity.slice(0, 300); }
+    let toastTimer;
+    function toast(m) { const e = $('toast'); e.textContent = m; e.classList.remove('hidden'); clearTimeout(toastTimer); toastTimer = setTimeout(() => e.classList.add('hidden'), 2800); }
 
-    function removeAccents(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9 .@-]/g, ''); }
-    function emvField(id, v) { return `${id}${String(v.length).padStart(2, '0')}${v}`; }
-    function crc16CCITT(s) {
-      let crc = 0xFFFF;
-      for (let i = 0; i < s.length; i++) {
-        crc ^= (s.charCodeAt(i) << 8);
-        for (let j = 0; j < 8; j++) { crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1); crc &= 0xFFFF; }
+    const CARD = 'rounded-2xl bg-white border border-slate-200/80 p-4 shadow-sm';
+    const INP = 'w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm outline-none focus:border-indigo-400';
+    const BTN = 'w-full py-3 rounded-xl bg-indigo-600 text-white text-sm font-bold active:scale-[.99]';
+    const BTN2 = 'w-full py-3 rounded-xl bg-white border border-slate-200 text-slate-700 text-sm font-semibold';
+    const LBL = 'text-xs font-semibold text-slate-500';
+    const empty = m => `<div class="text-center text-xs text-slate-400 py-6">${m}</div>`;
+    function badge(st) {
+      const map = { confirmed: ['Confirmado', 'emerald'], active: ['Ativo', 'emerald'], answered: ['Atendido', 'emerald'], pending_check: ['Conferir extrato', 'amber'], pending: ['Pendente', 'amber'], new: ['Novo', 'amber'], swap: ['Troca pedida', 'rose'], inactive: ['Inativo', 'slate'], praying: ['Em Oração', 'indigo'] };
+      const [l, c] = map[st] || [st, 'slate'];
+      return `<span class="text-[11px] px-2.5 py-0.5 rounded-full bg-${c}-50 text-${c}-700 border border-${c}-200 font-semibold whitespace-nowrap">${l}</span>`;
+    }
+    const row = (ic, title, sub, onDel) => `<div class="flex justify-between items-center gap-2 py-2 border-b border-slate-100 last:border-0"><div class="min-w-0"><div class="text-sm truncate">${ic} ${esc(title)}</div><div class="text-[11px] text-slate-500">${esc(sub)}</div></div><button onclick="${onDel}" class="text-xs font-semibold text-rose-600 shrink-0">Excluir</button></div>`;
+
+    const clean = s => String(s || '').normalize('NFD').replace(/[^a-zA-Z0-9 .@-]/g, '');
+    const emv = (id, v) => id + String(v.length).padStart(2, '0') + v;
+    function crc16(s) {
+      let c = 0xFFFF;
+      for (let i = 0; i < s.length; i++) { c ^= s.charCodeAt(i) << 8; for (let j = 0; j < 8; j++) { c = (c & 0x8000) ? ((c << 1) ^ 0x1021) : (c << 1); c &= 0xFFFF; } }
+      return c.toString(16).toUpperCase().padStart(4, '0');
+    }
+    function brcode(key, name, city, amount, txid) {
+      const p = emv('00', '01') + emv('26', emv('00', 'br.gov.bcb.pix') + emv('01', key.trim())) + emv('52', '0000') + emv('53', '986') + emv('54', Number(amount).toFixed(2)) + emv('58', 'BR') + emv('59', clean(name).toUpperCase().slice(0, 25) || 'IGREJA') + emv('60', clean(city).toUpperCase().slice(0, 15) || 'BRASIL') + emv('62', emv('05', txid)) + '6304';
+      return p + crc16(p);
+    }
+    function qrSvg(text, cls) {
+      if (!window.qrcode) return '<div class="text-xs text-slate-400 p-6">QR indisponível sem internet</div>';
+      const q = qrcode(0, 'M'); q.addData(text); q.make();
+      return q.createSvgTag({ cellSize: 5, margin: 2, scalable: true }).replace('<svg ', '<svg class="' + cls + '" ');
+    }
+    function copy(txt, msg) { try { navigator.clipboard.writeText(txt); } catch (e) {} toast(msg); }
+
+    function enterAs(id) {
+      S.userId = id; const u = me();
+      S.view = u.isSuper ? 'super' : 'app';
+      const ms = db.memberships.filter(m => m.userId === id);
+      const act = ms.find(m => m.status === 'active');
+      S.churchId = (act || ms[0] || {}).churchId || null;
+      if (S.invite) { const c = db.churches.find(x => x.slug === S.invite); if (c && ms.some(m => m.churchId === c.id)) S.churchId = c.id; }
+      S.tab = 'home'; S.adminTab = 'overview'; S.pix = { step: 'form', category: 'tithe', amount: 100 };
+      save(); render(); scrollTo(0, 0);
+    }
+    function doLogin(e) {
+      e.preventDefault();
+      const em = $('l-email').value.trim().toLowerCase(), pw = $('l-pass').value;
+      const u = db.users.find(x => x.email.toLowerCase() === em && x.pass === pw);
+      if (!u) return toast('E-mail ou senha incorretos.');
+      enterAs(u.id);
+    }
+    function doSignup(e) {
+      e.preventDefault();
+      const name = $('s-name').value.trim(), em = $('s-email').value.trim().toLowerCase(), pw = $('s-pass').value;
+      if (!name || !em || pw.length < 6) return toast('Preencha nome, e-mail e senha (mín. 6).');
+      if (db.users.some(u => u.email.toLowerCase() === em)) return toast('E-mail já cadastrado. Entre com ele.');
+      const u = { id: uid('u'), name, email: em, pass: pw };
+      db.users.push(u); S.userId = u.id; S.churchId = null; S.view = 'app';
+      save(); render(); toast('Conta criada!');
+    }
+    function logout() { S = { userId: null, churchId: null, view: 'app', tab: 'home', adminTab: 'overview', authMode: 'login', pix: { step: 'form', category: 'tithe', amount: 100 }, invite: S.invite }; save(); render(); scrollTo(0, 0); }
+    function joinChurch(e) {
+      e.preventDefault();
+      const code = $('j-code').value.trim().toLowerCase().replace(/.*igreja=/, '').replace(/[^a-z0-9]/g, '');
+      const c = db.churches.find(x => x.slug === code);
+      if (!c) return toast('Código não encontrado. Confira com a secretaria.');
+      let m = db.memberships.find(x => x.userId === S.userId && x.churchId === c.id);
+      S.churchId = c.id;
+      if (!m) {
+        m = { id: uid('m'), churchId: c.id, userId: S.userId, role: 'member', status: c.joinMode === 'open' ? 'active' : 'pending', ministry: '' };
+        db.memberships.push(m);
+        log(m.status === 'active' ? `${me().name} entrou na igreja pelo link` : `${me().name} pediu para entrar na igreja`);
       }
-      return crc.toString(16).toUpperCase().padStart(4, '0');
+      S.invite = null; S.tab = 'home';
+      save(); render(); toast(m.status === 'active' ? 'Bem-vindo(a)!' : 'Pedido enviado à secretaria.');
     }
-    function generatePixBRCode(pixKey, name, city, amount, txid) {
-      const ma = emvField('26', emvField('00', 'br.gov.bcb.pix') + emvField('01', pixKey.trim()));
-      const p = emvField('00', '01') + ma + emvField('52', '0000') + emvField('53', '986') + emvField('54', Number(amount).toFixed(2)) + emvField('58', 'BR') + emvField('59', removeAccents(name).slice(0, 25).toUpperCase() || 'IGREJA') + emvField('60', removeAccents(city).slice(0, 15).toUpperCase() || 'SAO PAULO') + emvField('62', emvField('05', txid)) + '6304';
-      return p + crc16CCITT(p);
-    }
-
-    function renderVisualQR(payload) {
-      if (window.qrcode) { try { const q = qrcode(0, 'M'); q.addData(payload); q.make(); return q.createSvgTag({ cellSize: 5, margin: 2, scalable: true }).replace('<svg ', '<svg class="w-48 h-48 mx-auto" '); } catch (e) {} }
-      return renderFakeQR(payload);
-    }
-    function renderFakeQR(payload) {
-      const size = 21;
-      let hash = 2166136261;
-      for (let i = 0; i < payload.length; i++) { hash ^= payload.charCodeAt(i); hash = Math.imul(hash, 16777619); }
-      function bit(r, c) {
-        const corner = (r < 7 && c < 7) || (r < 7 && c >= size - 7) || (r >= size - 7 && c < 7);
-        if (corner) {
-          const lr = r < 7 ? r : r - (size - 7), lc = c < 7 ? c : c - (size - 7);
-          return lr === 0 || lr === 6 || lc === 0 || lc === 6 || (lr >= 2 && lr <= 4 && lc >= 2 && lc <= 4);
-        }
-        if (r >= 8 && r <= 12 && c >= 8 && c <= 12) return false;
-        return ((Math.imul(hash ^ (r * 31 + c * 17), 2654435761) >>> 28) & 1) === 1;
-      }
-      let rects = '';
-      for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) if (bit(r, c)) rects += `<rect x="${c * 8 + 8}" y="${r * 8 + 8}" width="7" height="7" rx="1.5" fill="#0F172A"/>`;
-      return `<svg viewBox="0 0 184 184" class="w-44 h-44 mx-auto"><rect width="184" height="184" rx="14" fill="#FFF"/>${rects}<rect x="74" y="74" width="36" height="36" rx="10" fill="#ECFDF5" stroke="#10B981" stroke-width="2"/><path d="M92 83 L99 90 L92 97 L85 90 Z" fill="#059669"/></svg>`;
-    }
-
-    function toggleMode() { state.mode = state.mode === 'member' ? 'admin' : 'member'; saveState(); render(); window.scrollTo(0, 0); }
-    function setMemberTab(tab) { state.memberTab = tab; if (tab === 'give' && state.pixFlow.step === 'receipt') state.pixFlow.step = 'form'; saveState(); render(); window.scrollTo(0, 0); }
-    function setAdminTab(tab) { state.adminTab = tab; saveState(); render(); }
-    function setProfile(key) {
-      const oldDef = PROFILES[state.profileKey].defaultName, oldV = PROFILES[state.profileKey].verse;
-      state.profileKey = key;
-      if (state.churchName === oldDef) state.churchName = PROFILES[key].defaultName;
-      if (state.dailyMessage === oldV) state.dailyMessage = PROFILES[key].verse;
-      saveState(); render(); showToast(`Perfil: ${PROFILES[key].label}`);
-    }
-    function toggleEventRegistration(id) {
-      const ev = state.events.find(e => e.id === id);
-      if (!ev) return;
-      ev.userRegistered = !ev.userRegistered;
-      ev.registered += ev.userRegistered ? 1 : -1;
-      logActivity(ev.userRegistered ? `${state.currentUser} se inscreveu em "${ev.title}"` : `${state.currentUser} cancelou inscrição`);
-      saveState(); render(); showToast(ev.userRegistered ? 'Presença confirmada!' : 'Inscrição cancelada.');
-    }
-    function selectPixCategory(c) { state.pixFlow.category = c; saveState(); render(); }
-    function selectPixAmount(v) { state.pixFlow.amount = Number(v); saveState(); render(); }
-    function startPixGeneration(e) {
+    function createChurch(e) {
       e.preventDefault();
-      const input = document.getElementById('custom-amount');
-      const amount = Number(input ? input.value : state.pixFlow.amount);
-      if (!amount || amount <= 0) { showToast('Informe um valor válido.'); return; }
-      const txid = 'IGR' + String(Date.now()).slice(-8);
-      state.pixFlow = { ...state.pixFlow, step: 'qrcode', amount, txid, payload: generatePixBRCode(state.pixKey, state.churchName, state.churchCity, amount, txid) };
-      saveState(); render();
+      const name = $('n-name').value.trim(); if (!name) return toast('Informe o nome da igreja.');
+      const base = clean(name).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) || 'igreja';
+      let slug = base, i = 2; while (db.churches.some(c => c.slug === slug)) slug = base + (i++);
+      const profile = $('n-prof').value;
+      const c = { id: uid('c'), slug, name, cnpj: $('n-cnpj').value.trim(), city: $('n-city').value.trim() || 'Brasil', pixKey: $('n-pix').value.trim(), profile, dailyMessage: PROFILES[profile].verse, joinMode: 'approval', plan: 'Teste grátis' };
+      db.churches.push(c);
+      db.memberships.push({ id: uid('m'), churchId: c.id, userId: S.userId, role: 'admin', status: 'active', ministry: 'Pastoral' });
+      S.churchId = c.id; S.view = 'admin'; S.adminTab = 'members';
+      log('Igreja criada no Comunidade+');
+      save(); render(); toast('Igreja criada! Agora compartilhe o link de convite.');
     }
-    function copyPixPayload() { if (navigator.clipboard) navigator.clipboard.writeText(state.pixFlow.payload || state.pixKey).catch(() => {}); showToast('Pix Copia e Cola copiado!'); }
-    function copyPixKeyDirect() { if (navigator.clipboard) navigator.clipboard.writeText(state.pixKey).catch(() => {}); showToast('Chave Pix copiada!'); }
-    function confirmMemberPixSent() {
-      const rec = { id: Date.now(), member: state.currentUser, category: state.pixFlow.category, amount: state.pixFlow.amount, status: 'pending_check', date: `Hoje, ${nowTime()}` };
-      state.contributions.unshift(rec);
-      state.pixFlow.step = 'receipt';
-      state.pixFlow.lastReceipt = rec;
-      logActivity(`${state.currentUser} informou Pix direto de ${fmtCurrency(rec.amount)}`);
-      saveState(); render(); showToast('Aviso enviado à tesouraria!');
-    }
-    function resetPixStep() { state.pixFlow.step = 'form'; saveState(); render(); }
-    function confirmContributionAdmin(id) {
-      const c = state.contributions.find(x => x.id === id);
-      if (c) { c.status = 'confirmed'; logActivity(`Tesouraria confirmou Pix de ${c.member}`); saveState(); render(); showToast('Confirmado no extrato!'); }
-    }
-    function submitPrayer(e) {
-      e.preventDefault();
-      const text = document.getElementById('prayer-text').value.trim();
-      if (!text) return;
-      state.prayers.unshift({ id: Date.now(), author: document.getElementById('prayer-anon').checked ? 'Anônimo' : state.currentUser, text, isPrivate: document.getElementById('prayer-private').checked, status: 'new', prayCount: 1, date: `Hoje, ${nowTime()}` });
-      logActivity(`Novo ${t('prayer').toLowerCase()} recebido`);
-      saveState(); render(); showToast('Pedido enviado!');
-    }
-    function incrementPray(id) { const p = state.prayers.find(x => x.id === id); if (p) { p.prayCount += 1; saveState(); render(); } }
-    function updateScheduleStatus(id, st) { const s = state.schedules.find(x => x.id === id); if (s) { s.status = st; saveState(); render(); showToast(st === 'confirmed' ? 'Confirmado!' : 'Troca solicitada.'); } }
-    function addAnnouncement(e) {
-      e.preventDefault();
-      const title = document.getElementById('adm-ann-title').value.trim(), body = document.getElementById('adm-ann-body').value.trim();
-      if (!title || !body) return;
-      state.announcements.unshift({ id: Date.now(), title, body, tag: document.getElementById('adm-ann-tag').value, date: `Hoje, ${nowTime()}` });
-      saveState(); render(); logActivity(`Novo aviso: ${title}`); saveState(); showToast('Aviso publicado!');
-    }
-    function addEvent(e) {
-      e.preventDefault();
-      const title = document.getElementById('adm-ev-title').value.trim(), date = document.getElementById('adm-ev-date').value.trim();
-      if (!title || !date) return;
-      state.events.unshift({ id: Date.now(), title, date, location: document.getElementById('adm-ev-loc').value.trim() || 'Templo Principal', spots: Number(document.getElementById('adm-ev-spots').value) || 100, registered: 0, userRegistered: false });
-      saveState(); render(); logActivity(`Novo evento: ${title}`); saveState(); showToast('Evento criado!');
-    }
-    function updatePrayerStatus(id, st) { const p = state.prayers.find(x => x.id === id); if (p) { p.status = st; saveState(); render(); showToast('Atualizado!'); } }
-    function saveChurchSettings(e) {
-      e.preventDefault();
-      state.churchName = document.getElementById('set-name').value.trim() || state.churchName;
-      state.churchCnpj = document.getElementById('set-cnpj').value.trim() || state.churchCnpj;
-      state.churchCity = document.getElementById('set-city').value.trim() || state.churchCity;
-      state.pixKey = document.getElementById('set-pix').value.trim() || state.pixKey;
-      state.dailyMessage = document.getElementById('set-msg').value.trim() || state.dailyMessage;
-      saveState(); render(); showToast('Configurações salvas!');
-    }
-    function resetDemo() { localStorage.removeItem(STORAGE_KEY); state = getDefaultState(); render(); showToast('Dados restaurados.'); }
+    function switchChurch(id) { S.churchId = id; S.view = 'app'; S.tab = 'home'; S.pix = { step: 'form', category: 'tithe', amount: 100 }; save(); render(); }
+    function switchView(v) { S.view = v; if (v === 'admin' && !ROLES[role()].tabs.includes(S.adminTab)) S.adminTab = ROLES[role()].tabs[0]; save(); render(); scrollTo(0, 0); }
+    function setTab(x) { S.tab = x; if (x === 'give' && S.pix.step === 'done') S.pix.step = 'form'; save(); render(); scrollTo(0, 0); }
+    function setAdminTab(x) { S.adminTab = x; save(); render(); scrollTo(0, 0); }
 
-    function statusBadge(st) {
-      if (st === 'confirmed' || st === 'answered') return `<span class="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">${st === 'confirmed' ? 'Confirmado' : 'Atendido'}</span>`;
-      if (st === 'pending_check') return `<span class="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-semibold">Conferir extrato</span>`;
-      if (st === 'swap') return `<span class="text-[11px] px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 font-semibold">Troca pedida</span>`;
-      if (st === 'praying') return `<span class="text-[11px] px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold">Em Oração</span>`;
-      return `<span class="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-semibold">${st === 'new' ? 'Novo' : 'Pendente'}</span>`;
+    const regCount = ev => ev.base + db.registrations.filter(r => r.eventId === ev.id).length;
+    const isReg = ev => db.registrations.some(r => r.eventId === ev.id && r.userId === S.userId);
+    function toggleReg(id) {
+      const ev = db.events.find(e => e.id === id); if (!ev) return;
+      if (isReg(ev)) { db.registrations = db.registrations.filter(r => !(r.eventId === id && r.userId === S.userId)); toast('Inscrição cancelada.'); }
+      else { if (regCount(ev) >= ev.spots) return toast('Vagas esgotadas.'); db.registrations.push({ eventId: id, userId: S.userId }); log(`${me().name} se inscreveu em "${ev.title}"`); toast('Presença confirmada!'); }
+      save(); render();
     }
-    function churchInitials() { return state.churchName.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || 'C+'; }
+    function pixCat(c) { S.pix.category = c; save(); render(); }
+    function pixAmt(v) { S.pix.amount = v; save(); render(); }
+    function pixGen(e) {
+      e.preventDefault();
+      const a = Number($('pix-amt').value); if (!(a > 0)) return toast('Informe um valor válido.');
+      const c = church(); if (!c.pixKey) return toast('A igreja ainda não cadastrou a chave Pix.');
+      const txid = 'CMP' + Date.now().toString(36).toUpperCase().slice(-8);
+      S.pix = { ...S.pix, step: 'qr', amount: a, txid, payload: brcode(c.pixKey, c.name, c.city, a, txid) };
+      save(); render(); scrollTo(0, 0);
+    }
+    function pixSent() {
+      const k = { id: uid('k'), churchId: S.churchId, userId: S.userId, category: S.pix.category, amount: S.pix.amount, status: 'pending_check', date: 'Hoje, ' + hhmm(), txid: S.pix.txid };
+      db.contributions.unshift(k);
+      log(`${me().name} informou Pix de ${money(k.amount)} (${t(k.category)})`);
+      S.pix.step = 'done'; S.pix.last = k.id;
+      save(); render(); toast('Tesouraria avisada!');
+    }
+    function pixReset() { S.pix.step = 'form'; save(); render(); }
+    function sendPrayer(e) {
+      e.preventDefault();
+      const text = $('pr-text').value.trim(); if (!text) return;
+      db.prayers.unshift({ id: uid('p'), churchId: S.churchId, userId: S.userId, anon: $('pr-anon').checked, text, isPrivate: $('pr-priv').checked, status: 'new', prayedBy: [], date: 'Hoje, ' + hhmm() });
+      log(`Novo ${t('prayer').toLowerCase()} recebido`);
+      save(); render(); toast('Pedido enviado!');
+    }
+    function pray(id) { const p = db.prayers.find(x => x.id === id); if (!p) return; p.prayedBy = p.prayedBy.includes(S.userId) ? p.prayedBy.filter(u => u !== S.userId) : [...p.prayedBy, S.userId]; save(); render(); }
+    function schedStatus(id, st) { const s = db.schedules.find(x => x.id === id); if (!s) return; s.status = st; log(`${uname(s.userId)} ${st === 'confirmed' ? 'confirmou' : 'pediu troca em'} ${s.ministry}`); save(); render(); toast(st === 'confirmed' ? 'Escala confirmada!' : 'Troca solicitada à liderança.'); }
 
-    function renderMemberView() {
-      const mySchedules = state.schedules.filter(s => s.volunteer.toLowerCase() === state.currentUser.toLowerCase());
-      let body = '';
-      if (state.memberTab === 'home') {
-        const nextEv = state.events[0];
-        body = `
-          <div class="space-y-4">
-            <div class="rounded-3xl hero-gradient text-white p-5 shadow-md">
-              <div class="flex justify-between text-xs text-indigo-100 mb-2"><span class="px-2.5 py-0.5 rounded-full bg-white/15 font-medium">Palavra do Dia</span><span>${escapeHtml(state.churchCity)}</span></div>
-              <p class="text-sm leading-relaxed font-medium">${escapeHtml(state.dailyMessage)}</p>
-            </div>
-            <div class="grid grid-cols-4 gap-2.5">
-              <button onclick="setMemberTab('give')" class="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-white border border-slate-100 shadow-sm"><div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs">R$</div><span class="text-xs font-semibold text-slate-700">Pix</span></button>
-              <button onclick="setMemberTab('prayer')" class="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-white border border-slate-100 shadow-sm"><div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-xs">♥</div><span class="text-xs font-semibold text-slate-700">Oração</span></button>
-              <button onclick="setMemberTab('schedule')" class="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-white border border-slate-100 shadow-sm"><div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs">✓</div><span class="text-xs font-semibold text-slate-700">Escala</span></button>
-              <button onclick="setMemberTab('events')" class="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-white border border-slate-100 shadow-sm"><div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs">📅</div><span class="text-xs font-semibold text-slate-700">Agenda</span></button>
-            </div>
-            ${nextEv ? `<div class="rounded-2xl bg-white border border-slate-200/80 p-4 shadow-sm space-y-2"><div class="flex justify-between"><span class="text-xs font-bold text-indigo-600 uppercase">Próximo ${escapeHtml(t('service'))}</span><span class="text-xs text-slate-500">${escapeHtml(nextEv.date)}</span></div><div class="font-bold text-base">${escapeHtml(nextEv.title)}</div><div class="flex justify-between items-center text-xs text-slate-500"><span>${escapeHtml(nextEv.location)}</span><button onclick="toggleEventRegistration(${nextEv.id})" class="px-3.5 py-1.5 rounded-xl font-semibold ${nextEv.userRegistered ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-indigo-600 text-white'}">${nextEv.userRegistered ? 'Inscrito ✓' : 'Participar'}</button></div></div>` : ''}
-            <div class="space-y-3">
-              <div class="text-xs font-bold uppercase tracking-wider text-slate-500 px-1">Mural de Avisos</div>
-              ${state.announcements.map(a => `<div class="rounded-2xl bg-white border border-slate-200/80 p-4 shadow-sm space-y-1.5"><div class="flex justify-between"><span class="text-[11px] px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 font-semibold">${escapeHtml(a.tag)}</span><span class="text-xs text-slate-400">${escapeHtml(a.date)}</span></div><div class="font-bold text-sm">${escapeHtml(a.title)}</div><p class="text-xs text-slate-600 leading-relaxed">${escapeHtml(a.body)}</p></div>`).join('')}
-            </div>
-          </div>`;
-      } else if (state.memberTab === 'events') {
-        body = `<div class="space-y-3"><h2 class="font-bold text-base">Agenda de ${escapeHtml(t('services'))} & Eventos</h2>${state.events.map(ev => `<div class="rounded-2xl bg-white border border-slate-200/80 p-4 shadow-sm space-y-3"><div><div class="font-bold text-sm">${escapeHtml(ev.title)}</div><div class="text-xs text-slate-500">${escapeHtml(ev.date)} • ${escapeHtml(ev.location)}</div><div class="text-[11px] text-slate-400 mt-1">${ev.registered}/${ev.spots} inscritos • ${Math.max(0, ev.spots - ev.registered)} vagas</div></div><button onclick="toggleEventRegistration(${ev.id})" class="w-full py-2.5 rounded-xl text-xs font-bold ${ev.userRegistered ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-indigo-600 text-white'}">${ev.userRegistered ? 'Presença Confirmada ✓' : 'Confirmar Inscrição'}</button></div>`).join('')}</div>`;
-      } else if (state.memberTab === 'give') {
-        const pf = state.pixFlow;
-        if (pf.step === 'form') {
-          body = `
-            <form onsubmit="startPixGeneration(event)" class="space-y-4">
-              <div class="rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 text-xs"><div class="font-bold text-emerald-900">Pix 100% Direto para a Igreja</div><div class="text-emerald-700 mt-0.5">Cai direto na conta PJ da igreja • <b>Taxa R$ 0,00</b></div></div>
-              <div class="grid grid-cols-3 gap-2">${['tithe', 'offering', 'missions'].map(c => `<button type="button" onclick="selectPixCategory('${c}')" class="py-2.5 rounded-xl text-xs font-semibold border ${pf.category === c ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-200'}">${escapeHtml(t(c))}</button>`).join('')}</div>
-              <div class="grid grid-cols-4 gap-2">${[50, 100, 200, 500].map(v => `<button type="button" onclick="selectPixAmount(${v})" class="py-2 rounded-xl text-xs font-semibold border ${pf.amount === v ? 'bg-emerald-50 text-emerald-700 border-emerald-400' : 'bg-white border-slate-200'}">R$ ${v}</button>`).join('')}</div>
-              <input id="custom-amount" type="number" min="1" value="${pf.amount}" oninput="state.pixFlow.amount = Number(this.value)" class="w-full px-4 py-3 rounded-xl bg-white border border-slate-200 text-base font-bold" />
-              <button type="submit" class="w-full py-3.5 rounded-2xl pix-gradient text-white text-sm font-bold shadow-md">Gerar Pix de ${fmtCurrency(pf.amount)}</button>
-              <div class="rounded-2xl bg-white border border-slate-200 p-3.5 space-y-1"><div class="flex justify-between"><span class="text-xs text-slate-500">Chave Pix da Igreja</span><button type="button" onclick="copyPixKeyDirect()" class="text-xs font-bold text-emerald-700">Copiar</button></div><div class="text-xs font-mono truncate">${escapeHtml(state.pixKey)}</div><div class="text-[11px] text-slate-500">${escapeHtml(state.churchName)} • CNPJ ${escapeHtml(state.churchCnpj)}</div></div>
-            </form>`;
-        } else if (pf.step === 'qrcode') {
-          body = `
-            <div class="space-y-4">
-              <div class="flex justify-between items-center"><button onclick="resetPixStep()" class="text-xs font-semibold text-slate-500">← Voltar</button><span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">Taxa R$ 0</span></div>
-              <div class="rounded-3xl bg-white border border-slate-200 p-5 text-center space-y-3 shadow-sm">
-                <div class="text-xs text-slate-500">${escapeHtml(t(pf.category))} para <b>${escapeHtml(state.churchName)}</b></div>
-                <div class="text-3xl font-extrabold">${fmtCurrency(pf.amount)}</div><div class="text-[11px] text-slate-500">CNPJ ${escapeHtml(state.churchCnpj)} • Chave ${escapeHtml(state.pixKey)}</div>
-                <div class="p-2 rounded-2xl bg-slate-50 inline-block">${renderVisualQR(pf.payload)}</div>
-                <button onclick="copyPixPayload()" class="w-full py-3 rounded-xl bg-slate-900 text-white text-xs font-bold">Copiar Pix Copia e Cola (BR Code)</button>
-              </div>
-              <button onclick="confirmMemberPixSent()" class="w-full py-3.5 rounded-2xl pix-gradient text-white text-sm font-bold shadow-md">Já fiz o Pix no meu banco ✓</button>
-            </div>`;
-        } else {
-          const r = pf.lastReceipt;
-          body = `<div class="py-6 text-center space-y-4"><div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-2xl font-bold">✓</div><h2 class="font-bold text-lg">Aviso de Pix Enviado!</h2><div class="rounded-2xl bg-white border border-slate-200 p-4 text-left space-y-2 text-xs"><div class="flex justify-between"><span>Valor</span><b class="text-emerald-700">${fmtCurrency(r.amount)}</b></div><div class="flex justify-between"><span>Status</span>${statusBadge(r.status)}</div></div><button onclick="resetPixStep()" class="w-full py-3 rounded-xl bg-indigo-600 text-white text-xs font-bold">Nova Contribuição</button></div>`;
-        }
-      } else if (state.memberTab === 'prayer') {
-        body = `<div class="space-y-4"><form onsubmit="submitPrayer(event)" class="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm space-y-3"><div class="font-bold text-sm">Enviar ${escapeHtml(t('prayer'))}</div><textarea id="prayer-text" rows="3" required placeholder="Compartilhe seu motivo..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm resize-none"></textarea><div class="flex gap-4 text-xs"><label class="flex items-center gap-1.5"><input id="prayer-anon" type="checkbox"/> Anônimo</label><label class="flex items-center gap-1.5"><input id="prayer-private" type="checkbox"/> Privado</label></div><button type="submit" class="w-full py-3 rounded-xl bg-indigo-600 text-white text-xs font-bold">Enviar Pedido</button></form>${state.prayers.filter(p => !p.isPrivate).map(p => `<div class="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm space-y-2"><div class="flex justify-between text-xs"><b>${escapeHtml(p.author)}</b><span class="text-slate-400">${escapeHtml(p.date)}</span></div><p class="text-xs text-slate-600">${escapeHtml(p.text)}</p><button onclick="incrementPray(${p.id})" class="text-xs px-3 py-1.5 rounded-xl bg-rose-50 text-rose-700 font-semibold">Estou orando (${p.prayCount})</button></div>`).join('')}</div>`;
-      } else {
-        body = `<div class="space-y-3"><h2 class="font-bold text-base">Minha Escala</h2>${mySchedules.map(s => `<div class="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm space-y-3"><div class="flex justify-between items-start"><div><div class="font-bold text-sm">${escapeHtml(s.ministry)}</div><div class="text-xs text-slate-500">${escapeHtml(s.event)}</div></div>${statusBadge(s.status)}</div><div class="flex gap-2"><button onclick="updateScheduleStatus(${s.id}, 'confirmed')" class="flex-1 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 text-white">Confirmar</button><button onclick="updateScheduleStatus(${s.id}, 'swap')" class="flex-1 py-2.5 rounded-xl text-xs font-semibold bg-slate-100">Pedir Troca</button></div></div>`).join('')}</div>`;
-      }
+    function memberAction(id, act) {
+      const m = db.memberships.find(x => x.id === id); if (!m) return;
+      if (act === 'approve') { m.status = 'active'; log(`${uname(m.userId)} foi aprovado(a)`); }
+      if (act === 'reject') { db.memberships = db.memberships.filter(x => x.id !== id); log(`Pedido de ${uname(m.userId)} recusado`); }
+      if (act === 'deactivate') { m.status = 'inactive'; log(`${uname(m.userId)} foi desativado(a)`); }
+      if (act === 'activate') m.status = 'active';
+      save(); render(); toast('Atualizado.');
+    }
+    function memberRole(id, r) {
+      const m = db.memberships.find(x => x.id === id); if (!m) return;
+      if (m.role === 'admin' && r !== 'admin' && of('memberships').filter(x => x.role === 'admin' && x.status === 'active').length < 2) { toast('A igreja precisa de pelo menos um admin.'); render(); return; }
+      m.role = r; log(`${uname(m.userId)} agora é ${ROLES[r].label}`);
+      save(); render(); toast('Função alterada.');
+    }
+    function memberMinistry(id, v) { const m = db.memberships.find(x => x.id === id); if (m) { m.ministry = v; save(); } }
+    function filterMembers() { document.querySelectorAll('.mrow').forEach(r => { r.style.display = r.dataset.q.includes(S.q || '') ? '' : 'none'; }); }
+    function addMember(e) {
+      e.preventDefault();
+      const name = $('am-name').value.trim(), em = $('am-email').value.trim().toLowerCase(); if (!name || !em) return;
+      let u = db.users.find(x => x.email.toLowerCase() === em);
+      if (!u) { u = { id: uid('u'), name, email: em, pass: '123456' }; db.users.push(u); }
+      if (db.memberships.some(m => m.userId === u.id && m.churchId === S.churchId)) return toast('Essa pessoa já está na igreja.');
+      db.memberships.push({ id: uid('m'), churchId: S.churchId, userId: u.id, role: 'member', status: 'active', ministry: $('am-min').value.trim() });
+      log(`${name} cadastrado(a) pela secretaria`);
+      save(); render(); toast('Membro cadastrado (senha provisória 123456).');
+    }
+    function confirmPix(id) { const k = db.contributions.find(x => x.id === id); if (!k) return; k.status = 'confirmed'; log(`Tesouraria confirmou Pix de ${uname(k.userId)} — ${money(k.amount)}`); save(); render(); toast('Baixa registrada!'); }
+    function addAnn(e) {
+      e.preventDefault();
+      const title = $('an-t').value.trim(), body = $('an-b').value.trim(); if (!title || !body) return;
+      db.announcements.unshift({ id: uid('a'), churchId: S.churchId, title, body, tag: $('an-g').value, date: 'Hoje, ' + hhmm() });
+      log(`Novo aviso: ${title}`); save(); render(); toast('Aviso publicado no app!');
+    }
+    function addEv(e) {
+      e.preventDefault();
+      const title = $('ev-t').value.trim(), date = $('ev-d').value.trim(); if (!title || !date) return;
+      db.events.unshift({ id: uid('e'), churchId: S.churchId, title, date, location: $('ev-l').value.trim() || 'Templo', spots: Number($('ev-s').value) || 100, base: 0 });
+      log(`Novo evento: ${title}`); save(); render(); toast('Evento publicado no app!');
+    }
+    function del(list, id) { db[list] = db[list].filter(x => x.id !== id); save(); render(); toast('Excluído.'); }
+    function prayerStatus(id, st) { const p = db.prayers.find(x => x.id === id); if (p) { p.status = st; save(); render(); toast('Atualizado.'); } }
+    function addSched(e) {
+      e.preventDefault();
+      const userId = $('sc-u').value, ev = $('sc-e').value.trim(), min = $('sc-m').value.trim(); if (!userId || !ev || !min) return;
+      db.schedules.push({ id: uid('s'), churchId: S.churchId, userId, event: ev, ministry: min, status: 'pending' });
+      log(`Escala criada: ${min} — ${uname(userId)}`); save(); render(); toast('Voluntário escalado!');
+    }
+    function saveSettings(e) {
+      e.preventDefault();
+      const c = church();
+      ['name', 'cnpj', 'city', 'pixKey', 'dailyMessage'].forEach(k => { const v = $('st-' + k).value.trim(); if (v) c[k] = v; });
+      c.joinMode = $('st-join').value;
+      save(); render(); toast('Configurações salvas!');
+    }
+    function setProfile(p) { const c = church(); if (c.dailyMessage === PROFILES[c.profile].verse) c.dailyMessage = PROFILES[p].verse; c.profile = p; save(); render(); toast('Vocabulário: ' + PROFILES[p].label); }
+    function setPlan(id, p) { const c = db.churches.find(x => x.id === id); if (c) { c.plan = p; save(); render(); toast('Plano atualizado.'); } }
+    const inviteLink = c => location.origin + location.pathname + '?igreja=' + c.slug;
+    function resetDemo() { localStorage.removeItem(DB_KEY); sessionStorage.removeItem(SS_KEY); location.href = location.pathname; }
 
-      const nav = [
-        { id: 'home', label: 'Início' }, { id: 'events', label: 'Agenda' },
-        { id: 'give', label: 'Pix' }, { id: 'prayer', label: 'Oração' }, { id: 'schedule', label: 'Escala' }
-      ];
+    function renderAuth() {
+      const inv = S.invite && db.churches.find(c => c.slug === S.invite);
+      const demo = [['u_pr', 'Pastor (admin)', 'Igreja Vida Nova'], ['u_tes', 'Tesouraria', 'Igreja Vida Nova'], ['u_lid', 'Líder de louvor', 'Igreja Vida Nova'], ['u_fiel', 'Fiel', 'Igreja Vida Nova'], ['u_ana', 'Fiel aguardando aprovação', 'Igreja Vida Nova'], ['u_padre', 'Padre (admin)', 'Paróquia São José'], ['u_super', 'Dono da plataforma', 'Comunidade+']];
+      const login = S.authMode === 'login';
+      return `<div class="min-h-screen max-w-md mx-auto px-5 py-8 safe-t space-y-5">
+        <div class="text-center space-y-2"><img src="icon.svg" class="w-16 h-16 mx-auto rounded-2xl shadow-md" alt="" /><h1 class="text-2xl font-extrabold">Comunidade<span class="text-indigo-600">+</span></h1><p class="text-sm text-slate-500">O app da sua igreja: agenda, Pix direto, oração e escalas.</p></div>
+        ${inv ? `<div class="rounded-2xl bg-indigo-50 border border-indigo-200 p-3.5 text-sm text-indigo-900">Você foi convidado(a) para <b>${esc(inv.name)}</b>. Entre ou crie sua conta para participar.</div>` : ''}
+        <div class="${CARD} space-y-4">
+          <div class="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-xl text-sm font-semibold">
+            <button onclick="S.authMode='login';render()" class="py-2 rounded-lg ${login ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}">Entrar</button>
+            <button onclick="S.authMode='signup';render()" class="py-2 rounded-lg ${!login ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}">Criar conta</button>
+          </div>
+          ${login ? `<form onsubmit="doLogin(event)" class="space-y-3"><input id="l-email" type="email" required placeholder="E-mail" class="${INP}" /><input id="l-pass" type="password" required placeholder="Senha" class="${INP}" /><button class="${BTN}">Entrar</button></form>`
+          : `<form onsubmit="doSignup(event)" class="space-y-3"><input id="s-name" required placeholder="Seu nome completo" class="${INP}" /><input id="s-email" type="email" required placeholder="E-mail" class="${INP}" /><input id="s-pass" type="password" required minlength="6" placeholder="Crie uma senha (mín. 6)" class="${INP}" /><button class="${BTN}">Criar conta</button></form>`}
+        </div>
+        <div class="space-y-2"><div class="text-xs font-bold uppercase tracking-wider text-slate-500 px-1">Demonstração — entrar como</div>
+          <div class="grid grid-cols-2 gap-2">${demo.map(([id, l, c]) => `<button onclick="enterAs('${id}')" class="text-left p-3 rounded-xl bg-white border border-slate-200 hover:border-indigo-300"><div class="text-xs font-bold">${l}</div><div class="text-[11px] text-slate-500">${c}</div></button>`).join('')}</div>
+          <p class="text-[11px] text-slate-400 px-1">Protótipo de demonstração: os dados ficam salvos só neste aparelho. Senha das contas de exemplo: 123456.</p>
+        </div>
+      </div>`;
+    }
 
-      return `
-        <div class="min-h-screen flex flex-col max-w-md mx-auto w-full bg-[#F4F6FB] md:shadow-xl md:border-x md:border-slate-200">
-          <header class="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-100 px-4 pb-3 safe-top flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2.5 min-w-0">
-              <div class="w-9 h-9 rounded-2xl hero-gradient text-white flex items-center justify-center font-bold text-xs shrink-0">${escapeHtml(churchInitials())}</div>
-              <div class="min-w-0"><div class="font-bold text-sm truncate">${escapeHtml(state.churchName)}</div><div class="text-[11px] text-slate-500">Olá, ${escapeHtml(state.currentUser.split(' ')[0])}</div></div>
-            </div>
-            <button onclick="toggleMode()" class="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-bold shrink-0">Painel Admin</button>
-          </header>
-          <main class="flex-1 p-4 pb-24">${body}</main>
-          <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 max-w-md w-full z-20 grid grid-cols-5 bg-white/95 backdrop-blur-md border-t border-slate-200 px-1 pt-2 safe-bottom">
-            ${nav.map(i => `<button onclick="setMemberTab('${i.id}')" class="py-2 text-xs ${state.memberTab === i.id ? 'text-indigo-600 font-bold' : 'text-slate-400 font-medium'}">${i.label}</button>`).join('')}
-          </nav>
+    function renderOnboarding() {
+      const mine = db.memberships.filter(m => m.userId === S.userId);
+      return `<div class="min-h-screen max-w-md mx-auto px-5 py-8 safe-t space-y-5">
+        <div class="flex justify-between items-center"><div><div class="text-xs text-slate-500">Olá,</div><div class="font-bold">${esc(me().name)}</div></div><button onclick="logout()" class="text-xs font-semibold text-slate-500 px-3 py-1.5 rounded-xl bg-slate-100">Sair</button></div>
+        <form onsubmit="joinChurch(event)" class="${CARD} space-y-3"><div class="font-bold">Entrar na minha igreja</div><p class="text-xs text-slate-500">Digite o código ou cole o link de convite que sua igreja divulgou (ex.: <b>vidanova</b> ou <b>saojose</b>).</p><input id="j-code" required value="${esc(S.invite || '')}" placeholder="Código ou link da igreja" class="${INP}" /><button class="${BTN}">Entrar na igreja</button></form>
+        <form onsubmit="createChurch(event)" class="${CARD} space-y-3"><div class="font-bold">Cadastrar minha igreja</div><p class="text-xs text-slate-500">Para pastores e secretarias. Você vira o administrador e recebe o link de convite para os fiéis.</p>
+          <input id="n-name" required placeholder="Nome da igreja" class="${INP}" />
+          <select id="n-prof" class="${INP}">${Object.entries(PROFILES).map(([k, p]) => `<option value="${k}">${p.label}</option>`).join('')}</select>
+          <div class="grid grid-cols-2 gap-2"><input id="n-cnpj" placeholder="CNPJ" class="${INP}" /><input id="n-city" placeholder="Cidade" class="${INP}" /></div>
+          <input id="n-pix" placeholder="Chave Pix da conta PJ" class="${INP}" />
+          <button class="${BTN}">Criar igreja (30 dias grátis)</button></form>
+        ${mine.length ? `<div class="${CARD} space-y-1"><div class="font-bold text-sm mb-1">Minhas igrejas</div>${mine.map(m => { const c = db.churches.find(x => x.id === m.churchId); return c ? `<button onclick="switchChurch('${c.id}')" class="w-full flex justify-between items-center py-2 text-sm border-b border-slate-100 last:border-0"><span>${esc(c.name)}</span>${badge(m.status)}</button>` : ''; }).join('')}</div>` : ''}
+      </div>`;
+    }
+
+    function renderPending(c, st) {
+      const inact = st === 'inactive';
+      return `<div class="min-h-screen max-w-md mx-auto px-5 py-10 safe-t text-center space-y-4"><div class="w-16 h-16 rounded-full ${inact ? 'bg-slate-100' : 'bg-amber-100'} flex items-center justify-center mx-auto text-2xl">${inact ? '🔒' : '⏳'}</div><h2 class="text-lg font-bold">${inact ? 'Acesso inativo' : 'Aguardando aprovação'}</h2><p class="text-sm text-slate-500">${inact ? `Seu acesso a <b>${esc(c.name)}</b> está inativo. Fale com a secretaria.` : `Seu pedido para entrar em <b>${esc(c.name)}</b> foi enviado. Assim que a secretaria aprovar, o app libera tudo.`}</p><button onclick="db=loadDB();render()" class="${BTN}">Verificar de novo</button><button onclick="S.churchId=null;save();render()" class="${BTN2}">Entrar em outra igreja</button><button onclick="logout()" class="text-xs text-slate-500 font-semibold">Sair</button></div>`;
+    }
+    function renderBlocked(c) { return `<div class="min-h-screen max-w-md mx-auto px-5 py-10 safe-t text-center space-y-4"><div class="text-3xl">⛔</div><h2 class="text-lg font-bold">Assinatura suspensa</h2><p class="text-sm text-slate-500">O acesso de <b>${esc(c.name)}</b> ao Comunidade+ está suspenso. Fale com a administração da igreja.</p><button onclick="logout()" class="${BTN2}">Sair</button></div>`; }
+
+    function regBtn(ev, pad) {
+      const r = isReg(ev), full = !r && regCount(ev) >= ev.spots;
+      return `<button onclick="toggleReg('${ev.id}')" ${full ? 'disabled' : ''} class="${pad} rounded-xl text-xs font-bold shrink-0 ${r ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : full ? 'bg-slate-100 text-slate-400' : 'bg-indigo-600 text-white'}">${r ? 'Inscrito ✓' : full ? 'Esgotado' : 'Participar'}</button>`;
+    }
+    function myGiving() {
+      const ks = of('contributions').filter(k => k.userId === S.userId); if (!ks.length) return '';
+      return `<div class="${CARD} text-left space-y-1"><div class="font-bold text-sm mb-1">Minhas contribuições</div>${ks.slice(0, 6).map(k => `<div class="flex justify-between items-center gap-2 text-xs py-1.5 border-b border-slate-100 last:border-0"><span>${esc(t(k.category))} • ${esc(k.date)}</span><span class="flex items-center gap-2"><b>${money(k.amount)}</b>${badge(k.status)}</span></div>`).join('')}</div>`;
+    }
+
+    function renderApp() {
+      const c = church(), u = me(); let body = '';
+      const anns = of('announcements'), evs = of('events');
+      if (S.tab === 'home') {
+        const nx = evs[0];
+        body = `<div class="space-y-4">
+          <div class="rounded-3xl hero text-white p-5 shadow-md"><div class="flex justify-between text-xs text-indigo-100 mb-2"><span class="px-2.5 py-0.5 rounded-full bg-white/15 font-medium">${esc(t('word'))}</span><span>${esc(c.city)}</span></div><p class="text-sm leading-relaxed font-medium">${esc(c.dailyMessage)}</p></div>
+          <div class="grid grid-cols-4 gap-2.5">${[['give', 'R$', 'Pix', 'emerald'], ['prayer', '♥', 'Oração', 'rose'], ['schedule', '✓', 'Escala', 'indigo'], ['events', '📅', 'Agenda', 'amber']].map(([id, ic, l, col]) => `<button onclick="setTab('${id}')" class="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-white border border-slate-100 shadow-sm"><div class="w-10 h-10 rounded-xl bg-${col}-50 text-${col}-600 flex items-center justify-center font-bold text-sm">${ic}</div><span class="text-xs font-semibold text-slate-700">${l}</span></button>`).join('')}</div>
+          ${nx ? `<div class="${CARD} space-y-2"><div class="flex justify-between"><span class="text-xs font-bold text-indigo-600 uppercase">Próximo ${esc(t('service'))}</span><span class="text-xs text-slate-500">${esc(nx.date)}</span></div><div class="font-bold">${esc(nx.title)}</div><div class="flex justify-between items-center gap-2 text-xs text-slate-500"><span>${esc(nx.location)} • ${Math.max(0, nx.spots - regCount(nx))} vagas</span>${regBtn(nx, 'px-3.5 py-1.5')}</div></div>` : ''}
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-500 px-1">Mural de Avisos</div>
+          ${anns.map(a => `<div class="${CARD} space-y-1.5"><div class="flex justify-between"><span class="text-[11px] px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 font-semibold">${esc(a.tag)}</span><span class="text-xs text-slate-400">${esc(a.date)}</span></div><div class="font-bold text-sm">${esc(a.title)}</div><p class="text-xs text-slate-600 leading-relaxed">${esc(a.body)}</p></div>`).join('') || empty('Nenhum aviso por enquanto.')}
         </div>`;
-    }
-
-    function renderAdminView() {
-      const confirmedMoney = state.contributions.filter(c => c.status === 'confirmed').reduce((a, c) => a + Number(c.amount), 0);
-      const pendingCount = state.contributions.filter(c => c.status === 'pending_check').length;
-      const tabs = [{ id: 'overview', label: 'Resumo' }, { id: 'finance', label: `Pix (${pendingCount})` }, { id: 'content', label: 'Avisos' }, { id: 'prayers', label: 'Oração' }, { id: 'settings', label: 'Conta' }];
-      let body = '';
-      if (state.adminTab === 'overview') {
-        body = `<div class="space-y-4"><div class="grid grid-cols-2 gap-3"><div class="rounded-2xl bg-white border border-slate-200 p-4"><div class="text-xs text-slate-500">Membros</div><div class="text-2xl font-extrabold mt-1">${state.membersCount}</div></div><div class="rounded-2xl bg-emerald-50 border border-emerald-200 p-4"><div class="text-xs text-emerald-800">Pix Confirmado</div><div class="text-xl font-extrabold text-emerald-900 mt-1">${fmtCurrency(confirmedMoney)}</div></div></div><div class="rounded-2xl bg-white border border-slate-200 p-4 space-y-2"><div class="font-bold text-sm">Atividade Recente</div>${state.activityLog.map(i => `<div class="py-1.5 text-xs text-slate-700 border-b border-slate-100 last:border-0"><span class="font-mono text-slate-400 mr-2">${escapeHtml(i.time)}</span>${escapeHtml(i.text)}</div>`).join('')}</div></div>`;
-      } else if (state.adminTab === 'finance') {
-        body = `<div class="space-y-3"><div class="rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 text-xs text-emerald-900"><b>Pix Direto Ativo (Taxa R$ 0,00)</b><br/>Chave: <span class="font-mono">${escapeHtml(state.pixKey)}</span></div>${state.contributions.map(c => `<div class="rounded-2xl bg-white border border-slate-200 p-4 flex justify-between items-center"><div><div class="font-bold text-sm">${escapeHtml(c.member)}</div><div class="text-xs text-slate-500">${escapeHtml(t(c.category))} • ${escapeHtml(c.date)}</div><div class="mt-1">${statusBadge(c.status)}</div></div><div class="text-right space-y-1.5"><div class="font-extrabold text-sm text-emerald-700">${fmtCurrency(c.amount)}</div>${c.status === 'pending_check' ? `<button onclick="confirmContributionAdmin(${c.id})" class="px-3 py-1 rounded-xl bg-emerald-600 text-white text-xs font-bold">Confirmar ✓</button>` : ''}</div></div>`).join('')}</div>`;
-      } else if (state.adminTab === 'content') {
-        body = `<div class="space-y-4"><form onsubmit="addAnnouncement(event)" class="rounded-2xl bg-white border border-slate-200 p-4 space-y-2.5"><div class="font-bold text-sm">Publicar Aviso</div><input id="adm-ann-title" required placeholder="Título" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"/><textarea id="adm-ann-body" rows="2" required placeholder="Mensagem..." class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"></textarea><div class="flex gap-2"><select id="adm-ann-tag" class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs"><option>Importante</option><option>Aviso Geral</option></select><button type="submit" class="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold">Publicar</button></div></form><form onsubmit="addEvent(event)" class="rounded-2xl bg-white border border-slate-200 p-4 space-y-2.5"><div class="font-bold text-sm">Criar Evento</div><input id="adm-ev-title" required placeholder="Nome" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"/><input id="adm-ev-date" required placeholder="Sexta • 20:00" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"/><input id="adm-ev-loc" placeholder="Local" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"/><input id="adm-ev-spots" type="hidden" value="100"/><button type="submit" class="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold">Criar Evento</button></form><div class="rounded-2xl bg-white border border-slate-200 p-4 space-y-2"><div class="font-bold text-sm">Publicados</div>${state.announcements.map(a => `<div class="flex justify-between items-center text-xs py-1.5 border-b border-slate-100"><span>📢 ${escapeHtml(a.title)}</span><button onclick="deleteItem('announcements',${a.id})" class="text-rose-600 font-semibold">Excluir</button></div>`).join('')}${state.events.map(ev => `<div class="flex justify-between items-center text-xs py-1.5 border-b border-slate-100"><span>📅 ${escapeHtml(ev.title)}</span><button onclick="deleteItem('events',${ev.id})" class="text-rose-600 font-semibold">Excluir</button></div>`).join('')}</div></div>`;
-      } else if (state.adminTab === 'prayers') {
-        body = `<div class="space-y-3">${state.prayers.map(p => `<div class="rounded-2xl bg-white border border-slate-200 p-4 space-y-2"><div class="flex justify-between text-xs"><b>${escapeHtml(p.author)}</b>${statusBadge(p.status)}</div><p class="text-xs text-slate-600">${escapeHtml(p.text)}</p><div class="flex gap-2"><button onclick="updatePrayerStatus(${p.id}, 'praying')" class="flex-1 py-2 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-semibold">Em Oração</button><button onclick="updatePrayerStatus(${p.id}, 'answered')" class="flex-1 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-semibold">Atendido</button></div></div>`).join('')}</div>`;
+      } else if (S.tab === 'events') {
+        body = `<div class="space-y-3"><h2 class="font-bold">Agenda de ${esc(t('services'))} & Eventos</h2>${evs.map(ev => { const n = regCount(ev); return `<div class="${CARD} space-y-3"><div><div class="font-bold text-sm">${esc(ev.title)}</div><div class="text-xs text-slate-500">${esc(ev.date)} • ${esc(ev.location)}</div></div><div class="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full bg-indigo-500" style="width:${Math.min(100, n / ev.spots * 100)}%"></div></div><div class="flex justify-between items-center gap-2 text-[11px] text-slate-500"><span>${n}/${ev.spots} inscritos • ${Math.max(0, ev.spots - n)} vagas</span>${regBtn(ev, 'px-4 py-2')}</div></div>`; }).join('') || empty('Nenhum evento agendado.')}</div>`;
+      } else if (S.tab === 'give') {
+        const p = S.pix;
+        if (p.step === 'form') {
+          body = `<form onsubmit="pixGen(event)" class="space-y-4">
+            <div class="rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 text-xs"><div class="font-bold text-emerald-900">Pix direto para a conta da igreja</div><div class="text-emerald-700 mt-0.5">Sem intermediário • cai na conta PJ • <b>Taxa R$ 0,00</b></div></div>
+            <div><div class="${LBL} mb-1.5">Categoria</div><div class="grid grid-cols-3 gap-2">${['tithe', 'offering', 'missions'].map(k => `<button type="button" onclick="pixCat('${k}')" class="py-2.5 rounded-xl text-xs font-semibold border ${p.category === k ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-200'}">${esc(t(k))}</button>`).join('')}</div></div>
+            <div><div class="${LBL} mb-1.5">Valor</div><div class="grid grid-cols-4 gap-2 mb-2">${[20, 50, 100, 200].map(v => `<button type="button" onclick="pixAmt(${v})" class="py-2 rounded-xl text-xs font-semibold border ${p.amount === v ? 'bg-emerald-50 text-emerald-700 border-emerald-400' : 'bg-white border-slate-200'}">R$ ${v}</button>`).join('')}</div>
+            <input id="pix-amt" type="number" min="1" step="0.01" value="${p.amount}" oninput="S.pix.amount=Number(this.value)" class="${INP} text-lg font-bold" /></div>
+            <button class="w-full py-3.5 rounded-2xl pix text-white text-sm font-bold shadow-md">Gerar Pix</button>
+            <div class="${CARD} space-y-1"><div class="flex justify-between items-center"><span class="text-xs text-slate-500">Recebedor</span><button type="button" onclick="copy(church().pixKey,'Chave Pix copiada!')" class="text-xs font-bold text-emerald-700">Copiar chave</button></div><div class="text-sm font-bold">${esc(c.name)}</div><div class="text-xs text-slate-500">CNPJ ${esc(c.cnpj || '—')}</div><div class="text-xs font-mono truncate">${esc(c.pixKey || 'Chave não cadastrada')}</div></div>
+            ${myGiving()}
+          </form>`;
+        } else if (p.step === 'qr') {
+          body = `<div class="space-y-4"><div class="flex justify-between items-center"><button onclick="pixReset()" class="text-xs font-semibold text-slate-500">← Voltar</button><span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">Taxa R$ 0,00</span></div>
+            <div class="rounded-3xl bg-white border border-slate-200 p-5 text-center space-y-3 shadow-sm"><div class="text-xs text-slate-500">${esc(t(p.category))} para</div><div class="font-bold">${esc(c.name)}</div><div class="text-[11px] text-slate-500">CNPJ ${esc(c.cnpj)} • ${esc(c.pixKey)}</div><div class="text-3xl font-extrabold">${money(p.amount)}</div>${qrSvg(p.payload, 'w-52 h-52 mx-auto')}
+            <div class="text-[10px] font-mono break-all text-slate-500 bg-slate-50 rounded-xl p-2.5 text-left">${esc(p.payload)}</div>
+            <button onclick="copy(S.pix.payload,'Pix Copia e Cola copiado!')" class="w-full py-3 rounded-xl bg-slate-900 text-white text-xs font-bold">Copiar Pix Copia e Cola</button></div>
+            <p class="text-xs text-slate-500 text-center">Abra o app do seu banco, pague com o QR Code ou com o Copia e Cola e depois toque abaixo.</p>
+            <button onclick="pixSent()" class="w-full py-3.5 rounded-2xl pix text-white text-sm font-bold shadow-md">Já fiz o Pix no meu banco ✓</button></div>`;
+        } else {
+          const k = db.contributions.find(x => x.id === p.last) || {};
+          body = `<div class="py-4 text-center space-y-4"><div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-2xl font-bold">✓</div><h2 class="font-bold text-lg">Obrigado pela sua contribuição!</h2><p class="text-xs text-slate-500">A tesouraria vai conferir no extrato e confirmar.</p><div class="${CARD} text-left space-y-2 text-xs"><div class="flex justify-between"><span>${esc(t(k.category))}</span><b class="text-emerald-700">${money(k.amount)}</b></div><div class="flex justify-between items-center"><span>Status</span>${badge(k.status)}</div></div>${myGiving()}<button onclick="pixReset()" class="${BTN}">Nova contribuição</button></div>`;
+        }
+      } else if (S.tab === 'prayer') {
+        const list = of('prayers').filter(p => !p.isPrivate || p.userId === S.userId);
+        body = `<div class="space-y-4"><form onsubmit="sendPrayer(event)" class="${CARD} space-y-3"><div class="font-bold text-sm">Enviar ${esc(t('prayer'))}</div><textarea id="pr-text" rows="3" required placeholder="Compartilhe seu motivo de oração..." class="${INP} resize-none"></textarea><div class="flex flex-wrap gap-4 text-xs text-slate-600"><label class="flex items-center gap-1.5"><input id="pr-anon" type="checkbox" class="accent-indigo-600" /> Anônimo</label><label class="flex items-center gap-1.5"><input id="pr-priv" type="checkbox" class="accent-indigo-600" /> Privado (só liderança)</label></div><button class="${BTN}">Enviar pedido</button></form>
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-500 px-1">Mural de Oração</div>
+          ${list.map(p => { const on = p.prayedBy.includes(S.userId); return `<div class="${CARD} space-y-2"><div class="flex justify-between items-center gap-2 text-xs"><b>${p.anon ? 'Anônimo' : esc(uname(p.userId))}</b><span class="flex items-center gap-2">${p.isPrivate ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Privado</span>' : ''}${p.status !== 'new' ? badge(p.status) : ''}<span class="text-slate-400">${esc(p.date)}</span></span></div><p class="text-sm text-slate-700">${esc(p.text)}</p>${p.isPrivate ? '' : `<button onclick="pray('${p.id}')" class="text-xs px-3 py-1.5 rounded-xl font-semibold ${on ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700'}">🙏 ${on ? 'Orando' : 'Estou orando'} (${p.prayedBy.length})</button>`}</div>`; }).join('') || empty('Nenhum pedido ainda.')}</div>`;
       } else {
-        body = `<form onsubmit="saveChurchSettings(event)" class="rounded-2xl bg-white border border-slate-200 p-4 space-y-3"><div class="font-bold text-sm">Conta Pix & Perfil</div><select onchange="setProfile(this.value)" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"><option value="evangelica" ${state.profileKey === 'evangelica' ? 'selected' : ''}>Igreja Evangélica</option><option value="catolica" ${state.profileKey === 'catolica' ? 'selected' : ''}>Paróquia Católica</option><option value="generico" ${state.profileKey === 'generico' ? 'selected' : ''}>Templo / Genérico</option></select><input id="set-name" value="${escapeHtml(state.churchName)}" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"/><input id="set-cnpj" value="${escapeHtml(state.churchCnpj)}" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"/><input id="set-pix" value="${escapeHtml(state.pixKey)}" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono"/><input id="set-city" value="${escapeHtml(state.churchCity)}" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"/><textarea id="set-msg" rows="2" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">${escapeHtml(state.dailyMessage)}</textarea><button type="submit" class="w-full py-3 rounded-xl bg-indigo-600 text-white text-xs font-bold">Salvar</button><button type="button" onclick="resetDemo()" class="w-full py-2 rounded-xl border border-slate-200 text-xs text-slate-500">Restaurar dados</button></form>`;
+        const mine = of('schedules').filter(s => s.userId === S.userId);
+        body = `<div class="space-y-3"><h2 class="font-bold">Minha Escala</h2>${mine.map(s => `<div class="${CARD} space-y-3"><div class="flex justify-between items-start gap-2"><div><div class="font-bold text-sm">${esc(s.ministry)}</div><div class="text-xs text-slate-500">${esc(s.event)}</div></div>${badge(s.status)}</div><div class="flex gap-2"><button onclick="schedStatus('${s.id}','confirmed')" class="flex-1 py-2.5 rounded-xl text-xs font-bold ${s.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-indigo-600 text-white'}">${s.status === 'confirmed' ? 'Confirmado ✓' : 'Confirmar'}</button><button onclick="schedStatus('${s.id}','swap')" class="flex-1 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700">Pedir Troca</button></div></div>`).join('') || empty('Você não está escalado(a) no momento.')}</div>`;
       }
-      return `<div class="min-h-screen flex flex-col max-w-2xl mx-auto w-full bg-[#F4F6FB]"><header class="sticky top-0 z-20 bg-white border-b border-slate-200 px-4 pb-3 safe-top flex justify-between items-center"><div><div class="font-bold text-sm">Painel da Igreja</div><div class="text-[11px] text-slate-500">${escapeHtml(state.churchName)}</div></div><button onclick="toggleMode()" class="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold">App do Fiel</button></header><div class="bg-white border-b border-slate-200 px-3 flex gap-1 overflow-x-auto hide-scrollbar">${tabs.map(t => `<button onclick="setAdminTab('${t.id}')" class="px-3 py-2.5 text-xs whitespace-nowrap border-b-2 ${state.adminTab === t.id ? 'border-indigo-600 text-indigo-700 font-bold' : 'border-transparent text-slate-500'}">${t.label}</button>`).join('')}</div><main class="flex-1 p-4 pb-10">${body}</main></div>`;
+      const nav = [['home', 'Início', '⌂'], ['events', 'Agenda', '📅'], ['give', 'Pix', 'R$'], ['prayer', 'Oração', '♥'], ['schedule', 'Escala', '✓']];
+      const myCh = db.memberships.filter(m => m.userId === S.userId && m.status === 'active');
+      return `<div class="min-h-screen flex flex-col max-w-md mx-auto w-full md:shadow-xl md:border-x md:border-slate-200">
+        <header class="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-100 px-4 pb-3 safe-t flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2.5 min-w-0"><div class="w-9 h-9 rounded-2xl hero text-white flex items-center justify-center font-bold text-xs shrink-0">${esc(initials(c.name))}</div><div class="min-w-0">${myCh.length > 1 ? `<select onchange="switchChurch(this.value)" class="font-bold text-sm bg-transparent max-w-[160px]">${myCh.map(m => { const x = db.churches.find(y => y.id === m.churchId); return x ? `<option value="${x.id}" ${x.id === c.id ? 'selected' : ''}>${esc(x.name)}</option>` : ''; }).join('')}</select>` : `<div class="font-bold text-sm truncate">${esc(c.name)}</div>`}<div class="text-[11px] text-slate-500">Olá, ${esc(u.name.split(' ')[0])}</div></div></div>
+          <div class="flex items-center gap-1.5 shrink-0">${isStaff() ? `<button onclick="switchView('admin')" class="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-bold">Painel Admin</button>` : ''}<button onclick="logout()" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-500 bg-slate-100">Sair</button></div>
+        </header>
+        <main class="flex-1 p-4 pb-28">${body}</main>
+        <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 max-w-md w-full z-20 grid grid-cols-5 bg-white/95 backdrop-blur border-t border-slate-200 px-1 pt-1.5 safe-b">${nav.map(([id, l, ic]) => `<button onclick="setTab('${id}')" class="py-1.5 flex flex-col items-center gap-0.5 text-[11px] ${S.tab === id ? 'text-indigo-600 font-bold' : 'text-slate-400 font-medium'}"><span class="text-base leading-none">${ic}</span>${l}</button>`).join('')}</nav>
+      </div>`;
     }
 
-    function deleteItem(list, id) { state[list] = state[list].filter(x => x.id !== id); logActivity('Item removido do mural/agenda'); saveState(); render(); showToast('Excluído.'); }
-    window.addEventListener('storage', e => { if (e.key === STORAGE_KEY) { const m = state.mode, mt = state.memberTab, at = state.adminTab; state = loadState(); state.mode = m; state.memberTab = mt; state.adminTab = at; render(); } });
-    function render() { document.getElementById('root').innerHTML = state.mode === 'member' ? renderMemberView() : renderAdminView(); }
+    function renderAdmin() {
+      const c = church(), tabs = ROLES[role()].tabs;
+      if (!tabs.includes(S.adminTab)) S.adminTab = tabs[0];
+      const A = S.adminTab;
+      const mems = of('memberships'), pend = mems.filter(m => m.status === 'pending'), ks = of('contributions'), pk = ks.filter(k => k.status === 'pending_check');
+      let body = '';
+      if (A === 'overview') {
+        const conf = ks.filter(k => k.status === 'confirmed').reduce((a, k) => a + k.amount, 0), pendV = pk.reduce((a, k) => a + k.amount, 0);
+        const stat = (l, v, cls) => `<div class="rounded-2xl border p-4 ${cls || 'bg-white border-slate-200'}"><div class="text-xs text-slate-500">${l}</div><div class="text-xl font-extrabold mt-1">${v}</div></div>`;
+        body = `<div class="space-y-4"><div class="grid grid-cols-2 gap-3">${stat('Membros ativos', mems.filter(m => m.status === 'active').length)}${stat('Aguardando aprovação', pend.length, pend.length ? 'bg-amber-50 border-amber-200' : '')}${can('finance') ? stat('Pix confirmado', money(conf), 'bg-emerald-50 border-emerald-200') + stat('A conferir no extrato', money(pendV)) : ''}${stat('Eventos', of('events').length)}${stat(esc(t('prayers')), of('prayers').filter(p => p.status !== 'answered').length)}</div>
+          <div class="${CARD} space-y-1"><div class="font-bold text-sm mb-1">Atividade recente</div>${of('activity').slice(0, 12).map(i => `<div class="py-1.5 text-xs text-slate-700 border-b border-slate-100 last:border-0"><span class="font-mono text-slate-400 mr-2">${esc(i.time)}</span>${esc(i.text)}</div>`).join('') || empty('Sem atividade ainda.')}</div></div>`;
+      } else if (A === 'members') {
+        const link = inviteLink(c);
+        const roleSel = m => role() === 'admin' ? `<select onchange="memberRole('${m.id}',this.value)" class="text-xs px-2 py-1 rounded-lg bg-slate-50 border border-slate-200">${Object.entries(ROLES).map(([k, r]) => `<option value="${k}" ${m.role === k ? 'selected' : ''}>${r.label}</option>`).join('')}</select>` : `<span class="text-xs text-slate-500">${ROLES[m.role].label}</span>`;
+        const listed = mems.filter(m => m.status !== 'pending');
+        body = `<div class="space-y-4">
+          <div class="${CARD} space-y-3"><div class="font-bold text-sm">Link de convite dos fiéis</div><p class="text-xs text-slate-500">Divulgue no telão, no grupo de WhatsApp ou imprima o QR Code. Código: <b>${esc(c.slug)}</b> • Entrada: <b>${c.joinMode === 'open' ? 'livre' : 'com aprovação'}</b></p><div class="flex gap-3 items-center"><div class="shrink-0 rounded-xl border border-slate-200 p-1 bg-white">${qrSvg(link, 'w-24 h-24')}</div><div class="min-w-0 space-y-2 flex-1"><div class="text-[11px] font-mono break-all bg-slate-50 rounded-lg p-2">${esc(link)}</div><button onclick="copy('${esc(link)}','Link de convite copiado!')" class="w-full py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold">Copiar link</button></div></div></div>
+          ${pend.length ? `<div class="rounded-2xl bg-white border border-amber-200 p-4 shadow-sm space-y-1"><div class="font-bold text-sm mb-1">Pedidos para entrar (${pend.length})</div>${pend.map(m => { const u = db.users.find(x => x.id === m.userId) || {}; return `<div class="flex justify-between items-center gap-2 py-2 border-b border-slate-100 last:border-0"><div class="min-w-0"><div class="text-sm font-semibold truncate">${esc(u.name)}</div><div class="text-[11px] text-slate-500 truncate">${esc(u.email)}</div></div><div class="flex gap-1.5 shrink-0"><button onclick="memberAction('${m.id}','approve')" class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold">Aprovar</button><button onclick="memberAction('${m.id}','reject')" class="px-3 py-1.5 rounded-lg bg-slate-100 text-xs font-semibold">Recusar</button></div></div>`; }).join('')}</div>` : ''}
+          <div class="${CARD} space-y-1"><div class="flex justify-between items-center gap-2 mb-1"><div class="font-bold text-sm">Membros (${listed.length})</div><input oninput="S.q=this.value.toLowerCase();filterMembers()" placeholder="Buscar..." class="text-xs px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 w-32" /></div>
+            ${listed.map(m => { const u = db.users.find(x => x.id === m.userId) || {}; return `<div data-q="${esc((u.name + ' ' + u.email + ' ' + (m.ministry || '')).toLowerCase())}" class="mrow py-2.5 border-b border-slate-100 last:border-0 space-y-1.5"><div class="flex justify-between items-center gap-2"><div class="min-w-0"><div class="text-sm font-semibold truncate">${esc(u.name)}${m.userId === S.userId ? ' <span class="text-[10px] text-indigo-600">(você)</span>' : ''}</div><div class="text-[11px] text-slate-500 truncate">${esc(u.email)}</div></div>${badge(m.status)}</div><div class="flex flex-wrap items-center gap-2">${roleSel(m)}<input value="${esc(m.ministry)}" onchange="memberMinistry('${m.id}',this.value)" placeholder="${esc(t('ministry'))}" class="text-xs px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 w-28" />${m.userId !== S.userId ? `<button onclick="memberAction('${m.id}','${m.status === 'active' ? 'deactivate' : 'activate'}')" class="text-xs font-semibold ${m.status === 'active' ? 'text-rose-600' : 'text-emerald-700'}">${m.status === 'active' ? 'Desativar' : 'Reativar'}</button>` : ''}</div></div>`; }).join('')}
+          </div>
+          <form onsubmit="addMember(event)" class="${CARD} space-y-2.5"><div class="font-bold text-sm">Cadastrar membro manualmente</div><input id="am-name" required placeholder="Nome" class="${INP}" /><input id="am-email" type="email" required placeholder="E-mail" class="${INP}" /><input id="am-min" placeholder="${esc(t('ministry'))} (opcional)" class="${INP}" /><button class="${BTN}">Cadastrar membro</button></form>
+        </div>`;
+      } else if (A === 'finance') {
+        const total = ks.filter(k => k.status === 'confirmed').reduce((a, k) => a + k.amount, 0);
+        const byCat = ['tithe', 'offering', 'missions'].map(k => [t(k), ks.filter(x => x.category === k && x.status === 'confirmed').reduce((a, x) => a + x.amount, 0)]);
+        body = `<div class="space-y-3"><div class="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 space-y-1"><div class="text-xs text-emerald-800 font-semibold">Pix direto • taxa R$ 0,00</div><div class="text-2xl font-extrabold text-emerald-900">${money(total)}</div><div class="text-[11px] text-emerald-800">confirmado no extrato • chave <span class="font-mono">${esc(c.pixKey)}</span></div><div class="grid grid-cols-3 gap-2 pt-2">${byCat.map(([l, v]) => `<div class="bg-white/70 rounded-xl p-2"><div class="text-[10px] text-emerald-800">${esc(l)}</div><div class="text-xs font-bold text-emerald-900">${money(v)}</div></div>`).join('')}</div></div>
+          <p class="text-[11px] text-slate-500 px-1">O dinheiro cai direto na conta da igreja. Confira o extrato do banco e dê baixa nos avisos dos fiéis.</p>
+          ${ks.map(k => `<div class="${CARD} flex justify-between items-center gap-2"><div class="min-w-0"><div class="font-bold text-sm truncate">${esc(uname(k.userId))}</div><div class="text-xs text-slate-500">${esc(t(k.category))} • ${esc(k.date)}</div><div class="text-[10px] text-slate-400 font-mono">ID ${esc(k.txid || '')}</div><div class="mt-1">${badge(k.status)}</div></div><div class="text-right space-y-1.5 shrink-0"><div class="font-extrabold text-sm text-emerald-700">${money(k.amount)}</div>${k.status === 'pending_check' ? `<button onclick="confirmPix('${k.id}')" class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold">Confirmar ✓</button>` : ''}</div></div>`).join('') || empty('Nenhuma contribuição ainda.')}</div>`;
+      } else if (A === 'content') {
+        body = `<div class="space-y-4">
+          <form onsubmit="addAnn(event)" class="${CARD} space-y-2.5"><div class="font-bold text-sm">Publicar aviso</div><input id="an-t" required placeholder="Título" class="${INP}" /><textarea id="an-b" rows="2" required placeholder="Mensagem" class="${INP}"></textarea><div class="flex gap-2"><select id="an-g" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm"><option>Importante</option><option>Aviso Geral</option><option>Ação Social</option><option>Jovens</option></select><button class="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold">Publicar</button></div></form>
+          <form onsubmit="addEv(event)" class="${CARD} space-y-2.5"><div class="font-bold text-sm">Criar ${esc(t('service').toLowerCase())} / evento</div><input id="ev-t" required placeholder="Nome" class="${INP}" /><div class="grid grid-cols-2 gap-2"><input id="ev-d" required placeholder="Sexta • 20:00" class="${INP}" /><input id="ev-s" type="number" min="1" placeholder="Vagas" class="${INP}" /></div><input id="ev-l" placeholder="Local" class="${INP}" /><button class="${BTN}">Criar evento</button></form>
+          <div class="${CARD} space-y-1"><div class="font-bold text-sm mb-1">Publicados no app</div>${of('announcements').map(a => row('📢', a.title, a.date, `del('announcements','${a.id}')`)).join('')}${of('events').map(e => row('📅', e.title, `${e.date} • ${regCount(e)}/${e.spots} inscritos`, `del('events','${e.id}')`)).join('')}</div></div>`;
+      } else if (A === 'prayers') {
+        body = `<div class="space-y-3"><p class="text-[11px] text-slate-500 px-1">Pedidos marcados como privados aparecem só aqui, para a liderança.</p>${of('prayers').map(p => `<div class="${CARD} space-y-2"><div class="flex justify-between items-center gap-2 text-xs"><b>${p.anon ? 'Anônimo' : esc(uname(p.userId))}${p.isPrivate ? ' <span class="text-slate-500 font-normal">• Privado</span>' : ''}</b>${badge(p.status)}</div><p class="text-sm text-slate-700">${esc(p.text)}</p><div class="text-[11px] text-slate-400">${esc(p.date)} • ${p.prayedBy.length} orando</div><div class="flex gap-2"><button onclick="prayerStatus('${p.id}','praying')" class="flex-1 py-2 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-semibold">Em Oração</button><button onclick="prayerStatus('${p.id}','answered')" class="flex-1 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-semibold">Atendido</button></div></div>`).join('') || empty('Nenhum pedido.')}</div>`;
+      } else if (A === 'schedules') {
+        const act = mems.filter(m => m.status === 'active');
+        body = `<div class="space-y-4"><form onsubmit="addSched(event)" class="${CARD} space-y-2.5"><div class="font-bold text-sm">Escalar voluntário</div><select id="sc-u" required class="${INP}"><option value="">Selecione o membro</option>${act.map(m => `<option value="${m.userId}">${esc(uname(m.userId))}${m.ministry ? ' — ' + esc(m.ministry) : ''}</option>`).join('')}</select><input id="sc-e" required placeholder="${esc(t('service'))} e data (ex.: Culto — Dom 18:30)" class="${INP}" /><input id="sc-m" required placeholder="Função (ex.: Louvor, Recepção, Mídia)" class="${INP}" /><button class="${BTN}">Escalar</button></form>
+          <div class="${CARD} space-y-1"><div class="font-bold text-sm mb-1">Escalas</div>${of('schedules').map(s => `<div class="flex justify-between items-center gap-2 py-2 border-b border-slate-100 last:border-0"><div class="min-w-0"><div class="text-sm font-semibold truncate">${esc(uname(s.userId))} • ${esc(s.ministry)}</div><div class="text-[11px] text-slate-500 truncate">${esc(s.event)}</div></div><div class="flex items-center gap-2 shrink-0">${badge(s.status)}<button onclick="del('schedules','${s.id}')" class="text-xs text-rose-600 font-semibold">✕</button></div></div>`).join('') || empty('Nenhuma escala.')}</div></div>`;
+      } else {
+        const fld = (k, l, cls) => `<label class="block space-y-1"><span class="${LBL}">${l}</span><input id="st-${k}" value="${esc(c[k])}" class="${INP} ${cls || ''}" /></label>`;
+        body = `<form onsubmit="saveSettings(event)" class="${CARD} space-y-3"><div class="font-bold text-sm">Conta & Marca</div>
+          <label class="block space-y-1"><span class="${LBL}">Tipo / vocabulário</span><select onchange="setProfile(this.value)" class="${INP}">${Object.entries(PROFILES).map(([k, p]) => `<option value="${k}" ${c.profile === k ? 'selected' : ''}>${p.label}</option>`).join('')}</select></label>
+          ${fld('name', 'Nome da igreja')}${fld('cnpj', 'CNPJ')}${fld('city', 'Cidade')}${fld('pixKey', 'Chave Pix (conta PJ da igreja)', 'font-mono')}
+          <label class="block space-y-1"><span class="${LBL}">${esc(t('word'))}</span><textarea id="st-dailyMessage" rows="3" class="${INP}">${esc(c.dailyMessage)}</textarea></label>
+          <label class="block space-y-1"><span class="${LBL}">Entrada de novos fiéis</span><select id="st-join" class="${INP}"><option value="approval" ${c.joinMode === 'approval' ? 'selected' : ''}>Com aprovação da secretaria</option><option value="open" ${c.joinMode === 'open' ? 'selected' : ''}>Livre (quem tem o link entra)</option></select></label>
+          <div class="text-[11px] text-slate-500">Plano: <b>${esc(c.plan)}</b> • Código de convite: <b>${esc(c.slug)}</b></div>
+          <button class="${BTN}">Salvar</button><button type="button" onclick="resetDemo()" class="${BTN2}">Restaurar dados da demonstração</button></form>`;
+      }
+      return `<div class="min-h-screen flex flex-col max-w-2xl mx-auto w-full">
+        <header class="sticky top-0 z-20 bg-white border-b border-slate-200 px-4 pb-3 safe-t flex justify-between items-center gap-2"><div class="min-w-0"><div class="font-bold text-sm">Painel da Igreja</div><div class="text-[11px] text-slate-500 truncate">${esc(c.name)} • ${esc(ROLES[role()].label)}</div></div><button onclick="switchView('app')" class="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold shrink-0">App do Fiel</button></header>
+        <div class="bg-white border-b border-slate-200 px-2 flex gap-1 overflow-x-auto hide-scrollbar">${tabs.map(x => `<button onclick="setAdminTab('${x}')" class="px-3 py-2.5 text-xs whitespace-nowrap border-b-2 ${A === x ? 'border-indigo-600 text-indigo-700 font-bold' : 'border-transparent text-slate-500'}">${TAB_LABEL[x]}${x === 'members' && pend.length ? ` (${pend.length})` : ''}${x === 'finance' && pk.length ? ` (${pk.length})` : ''}</button>`).join('')}</div>
+        <main class="flex-1 p-4 pb-10">${body}</main></div>`;
+    }
+
+    function renderSuper() {
+      const plans = ['Teste grátis', 'Essencial', 'Completo', 'Suspenso'];
+      return `<div class="min-h-screen max-w-2xl mx-auto"><header class="sticky top-0 z-20 bg-slate-900 text-white px-4 pb-3 safe-t flex justify-between items-center"><div><div class="font-bold text-sm">Comunidade+ • Plataforma</div><div class="text-[11px] text-slate-300">Visão do dono do SaaS</div></div><button onclick="logout()" class="px-3 py-1.5 rounded-xl bg-white/10 text-xs font-bold">Sair</button></header>
+        <main class="p-4 space-y-4"><div class="grid grid-cols-3 gap-3">${[['Igrejas', db.churches.length], ['Fiéis ativos', db.memberships.filter(m => m.status === 'active').length], ['Em teste', db.churches.filter(c => c.plan === 'Teste grátis').length]].map(([l, v]) => `<div class="rounded-2xl bg-white border border-slate-200 p-4"><div class="text-xs text-slate-500">${l}</div><div class="text-2xl font-extrabold mt-1">${v}</div></div>`).join('')}</div>
+        <div class="${CARD} space-y-1"><div class="font-bold text-sm mb-1">Igrejas clientes</div>${db.churches.map(c => { const ms = db.memberships.filter(m => m.churchId === c.id && m.status === 'active').length; return `<div class="py-2.5 border-b border-slate-100 last:border-0 flex justify-between items-center gap-2"><div class="min-w-0"><div class="text-sm font-semibold truncate">${esc(c.name)}</div><div class="text-[11px] text-slate-500">${esc(PROFILES[c.profile].label)} • ${esc(c.city)} • ${ms} membros • código ${esc(c.slug)}</div></div><select onchange="setPlan('${c.id}',this.value)" class="text-xs px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 shrink-0">${plans.map(p => `<option ${c.plan === p ? 'selected' : ''}>${p}</option>`).join('')}</select></div>`; }).join('')}</div>
+        <p class="text-[11px] text-slate-500 px-1">Por privacidade (LGPD), o dono da plataforma vê só os números de cada igreja, não os dados dos fiéis nem as contribuições. Mude o plano para "Suspenso" para bloquear uma igreja inadimplente.</p></main></div>`;
+    }
+
+    function render() {
+      const r = $('root');
+      if (!S.userId || !me()) { r.innerHTML = renderAuth(); return; }
+      const u = me();
+      if (u.isSuper && S.view === 'super') { r.innerHTML = renderSuper(); return; }
+      if (S.invite) {
+        const ic = db.churches.find(x => x.slug === S.invite);
+        if (ic && !db.memberships.some(m => m.userId === S.userId && m.churchId === ic.id)) { r.innerHTML = renderOnboarding(); return; }
+        S.invite = null;
+      }
+      const c = church(), m = myMem();
+      if (!c || !m) { r.innerHTML = renderOnboarding(); return; }
+      if (m.status !== 'active') { r.innerHTML = renderPending(c, m.status); return; }
+      if (c.plan === 'Suspenso') { r.innerHTML = renderBlocked(c); return; }
+      if (S.view === 'admin' && isStaff()) { r.innerHTML = renderAdmin(); return; }
+      S.view = 'app'; r.innerHTML = renderApp();
+    }
+
+    window.addEventListener('storage', e => {
+      if (e.key !== DB_KEY) return;
+      db = loadDB();
+      const a = document.activeElement;
+      if (a && ['INPUT', 'TEXTAREA', 'SELECT'].includes(a.tagName)) return;
+      render();
+    });
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
     render();
   </script>
 </body>
