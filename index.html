@@ -11,6 +11,8 @@
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
   <link rel="apple-touch-icon" href="icon.svg" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -103,13 +105,15 @@
       };
     }
 
-    function loadDB() { try { const r = localStorage.getItem(DB_KEY); if (r) return JSON.parse(r); } catch (e) {} return seed(); }
-    let db = loadDB();
-    let S = (() => { try { return JSON.parse(sessionStorage.getItem(SS_KEY)) || {}; } catch (e) { return {}; } })();
-    S = Object.assign({ userId: null, churchId: null, view: 'app', tab: 'home', adminTab: 'overview', authMode: 'login', pix: { step: 'form', category: 'tithe', amount: 100 } }, S);
+    const SB_URL = window.SUPABASE_URL || '', SB_KEY = window.SUPABASE_ANON_KEY || '';
+    const sb = (window.supabase && SB_URL.startsWith('https://') && SB_KEY.length > 30) ? window.supabase.createClient(SB_URL, SB_KEY) : null;
+    let db = { churches: [], users: [], memberships: [], announcements: [], events: [], registrations: [], schedules: [], prayers: [], contributions: [], activity: [], overview: [] };
+    let S = { userId: null, churchId: null, view: 'app', tab: 'home', adminTab: 'overview', authMode: 'login', pix: { step: 'form', category: 'tithe', amount: 100 }, loading: !!sb };
+    try { const pref = JSON.parse(localStorage.getItem('cmp_prefs') || '{}'); if (pref.churchId) S.churchId = pref.churchId; } catch (e) {}
     const inviteParam = new URLSearchParams(location.search).get('igreja');
-    if (inviteParam) S.invite = inviteParam.toLowerCase();
-    function save() { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch (e) {} try { sessionStorage.setItem(SS_KEY, JSON.stringify(S)); } catch (e) {} }
+    if (inviteParam) S.invite = inviteParam.toLowerCase().replace(/[^a-z0-9]/g, '');
+    function save() { try { localStorage.setItem('cmp_prefs', JSON.stringify({ churchId: S.churchId })); } catch (e) {} }
+    function loadDB() { return db; }
 
     const $ = id => document.getElementById(id);
     const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -161,163 +165,224 @@
     }
     function copy(txt, msg) { try { navigator.clipboard.writeText(txt); } catch (e) {} toast(msg); }
 
-    function enterAs(id) {
-      S.userId = id; const u = me();
-      S.view = u.isSuper ? 'super' : 'app';
-      const ms = db.memberships.filter(m => m.userId === id);
-      const act = ms.find(m => m.status === 'active');
-      S.churchId = (act || ms[0] || {}).churchId || null;
-      if (S.invite) { const c = db.churches.find(x => x.slug === S.invite); if (c && ms.some(m => m.churchId === c.id)) S.churchId = c.id; }
-      S.tab = 'home'; S.adminTab = 'overview'; S.pix = { step: 'form', category: 'tithe', amount: 100 };
-      save(); render(); scrollTo(0, 0);
+    const PLAN = { trial: 'Teste grátis', essencial: 'Essencial', completo: 'Completo', suspenso: 'Suspenso' };
+    const PLAN_DB = Object.fromEntries(Object.entries(PLAN).map(([k, v]) => [v, k]));
+    let chan = null, rtTimer = null;
+    async function q(p) { const { data, error } = await p; if (error) { console.error(error); toast('Erro: ' + error.message); throw error; } return data; }
+    function when(ts) {
+      const d = new Date(ts), n = new Date(), hm = d.toTimeString().slice(0, 5);
+      if (d.toDateString() === n.toDateString()) return 'Hoje, ' + hm;
+      if (d.toDateString() === new Date(n - 86400000).toDateString()) return 'Ontem, ' + hm;
+      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + hm;
     }
-    function doLogin(e) {
+    async function reload() {
+      if (!sb || !S.userId) { S.loading = false; render(); return; }
+      try {
+        const [prof, chs, mems, names] = await Promise.all([
+          q(sb.from('profiles').select('id,name,email,is_platform_admin')),
+          q(sb.from('churches').select('*')),
+          q(sb.from('memberships').select('*')),
+          q(sb.rpc('my_church_names'))
+        ]);
+        db.users = prof.map(u => ({ id: u.id, name: u.name, email: u.email || '', isSuper: u.is_platform_admin }));
+        db.churches = chs.map(c => ({ id: c.id, slug: c.slug, name: c.name, cnpj: c.cnpj || '', city: c.city || '', pixKey: c.pix_key || '', profile: c.profile, dailyMessage: c.daily_message || PROFILES[c.profile].verse, joinMode: c.join_mode, plan: PLAN[c.plan] || c.plan }));
+        (names || []).forEach(n => { if (!db.churches.some(c => c.id === n.id)) db.churches.push({ id: n.id, slug: n.slug, name: n.name, cnpj: '', city: '', pixKey: '', profile: 'evangelica', dailyMessage: '', joinMode: 'approval', plan: '' }); });
+        db.memberships = mems.map(m => ({ id: m.id, churchId: m.church_id, userId: m.user_id, role: m.role, status: m.status, ministry: m.ministry || '' }));
+        const mine = db.memberships.filter(m => m.userId === S.userId);
+        if (!mine.some(m => m.churchId === S.churchId)) S.churchId = (mine.find(m => m.status === 'active') || mine[0] || {}).churchId || null;
+        save();
+        const cid = S.churchId;
+        if (cid && mine.some(m => m.churchId === cid && m.status === 'active')) {
+          const staff = isStaff();
+          const [ann, evs, regs, cnt, sch, prs, sup, ks, act] = await Promise.all([
+            q(sb.from('announcements').select('*').eq('church_id', cid).order('created_at', { ascending: false })),
+            q(sb.from('events').select('*').eq('church_id', cid).order('created_at', { ascending: true })),
+            q(sb.from('registrations').select('event_id,user_id')),
+            q(sb.rpc('event_counts', { c: cid })),
+            q(sb.from('schedules').select('*').eq('church_id', cid).order('created_at', { ascending: true })),
+            q(sb.from('prayer_wall').select('*').eq('church_id', cid).order('created_at', { ascending: false })),
+            q(sb.from('prayer_supports').select('prayer_id,user_id')),
+            q(sb.from('contributions').select('*').eq('church_id', cid).order('created_at', { ascending: false })),
+            staff ? q(sb.from('activity_log').select('*').eq('church_id', cid).order('created_at', { ascending: false }).limit(30)) : Promise.resolve([])
+          ]);
+          const counts = Object.fromEntries((cnt || []).map(r => [r.event_id, Number(r.total)]));
+          db.registrations = regs.map(r => ({ eventId: r.event_id, userId: r.user_id }));
+          db.announcements = ann.map(a => ({ id: a.id, churchId: cid, title: a.title, body: a.body, tag: a.tag || 'Aviso Geral', date: when(a.created_at) }));
+          db.events = evs.map(e => ({ id: e.id, churchId: cid, title: e.title, date: e.date_label || '', location: e.location || '', spots: e.spots, base: (counts[e.id] || 0) - db.registrations.filter(r => r.eventId === e.id).length }));
+          db.schedules = sch.map(s => ({ id: s.id, churchId: cid, userId: s.user_id, event: s.event_label, ministry: s.ministry, status: s.status }));
+          db.prayers = prs.map(p => ({ id: p.id, churchId: cid, userId: p.user_id, anon: !p.user_id, text: p.text, isPrivate: p.is_private, status: p.status, prayedBy: sup.filter(s => s.prayer_id === p.id).map(s => s.user_id), date: when(p.created_at) }));
+          db.contributions = ks.map(k => ({ id: k.id, churchId: cid, userId: k.user_id, category: k.category, amount: Number(k.amount), status: k.status, date: when(k.created_at), txid: k.txid }));
+          db.activity = act.map(l => ({ id: l.id, churchId: cid, time: when(l.created_at), text: l.text }));
+        }
+        db.overview = (me() && me().isSuper) ? await q(sb.rpc('platform_overview')) : [];
+      } catch (e) {}
+      S.loading = false; render(); subscribe();
+    }
+    function subscribe() {
+      if (!sb || chan || !S.userId) return;
+      chan = sb.channel('cmp-' + Math.random().toString(36).slice(2));
+      ['announcements', 'events', 'memberships', 'contributions', 'prayers', 'schedules'].forEach(tb => chan.on('postgres_changes', { event: '*', schema: 'public', table: tb }, () => {
+        clearTimeout(rtTimer);
+        rtTimer = setTimeout(() => { const a = document.activeElement; if (a && ['INPUT', 'TEXTAREA', 'SELECT'].includes(a.tagName)) return; reload(); }, 500);
+      }));
+      chan.subscribe();
+    }
+    async function run(fn, okMsg) { try { await fn(); } catch (e) { return false; } if (okMsg) toast(okMsg); await reload(); return true; }
+    async function log(text) { if (sb && S.churchId && S.userId) await sb.from('activity_log').insert({ church_id: S.churchId, actor_id: S.userId, text }); }
+
+    async function doLogin(e) {
       e.preventDefault();
-      const em = $('l-email').value.trim().toLowerCase(), pw = $('l-pass').value;
-      const u = db.users.find(x => x.email.toLowerCase() === em && x.pass === pw);
-      if (!u) return toast('E-mail ou senha incorretos.');
-      enterAs(u.id);
+      const { error } = await sb.auth.signInWithPassword({ email: $('l-email').value.trim(), password: $('l-pass').value });
+      if (error) toast(/confirm/i.test(error.message) ? 'Confirme seu e-mail pelo link que enviamos antes de entrar.' : 'E-mail ou senha incorretos.');
     }
-    function doSignup(e) {
+    async function doSignup(e) {
       e.preventDefault();
-      const name = $('s-name').value.trim(), em = $('s-email').value.trim().toLowerCase(), pw = $('s-pass').value;
-      if (!name || !em || pw.length < 6) return toast('Preencha nome, e-mail e senha (mín. 6).');
-      if (db.users.some(u => u.email.toLowerCase() === em)) return toast('E-mail já cadastrado. Entre com ele.');
-      const u = { id: uid('u'), name, email: em, pass: pw };
-      db.users.push(u); S.userId = u.id; S.churchId = null; S.view = 'app';
-      save(); render(); toast('Conta criada!');
+      const name = $('s-name').value.trim(), email = $('s-email').value.trim(), password = $('s-pass').value;
+      if (!name || password.length < 6) return toast('Preencha nome e senha (mín. 6).');
+      const { data, error } = await sb.auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: location.origin + location.pathname + (S.invite ? '?igreja=' + S.invite : '') } });
+      if (error) return toast(/registered/i.test(error.message) ? 'E-mail já cadastrado. Entre com ele.' : 'Erro: ' + error.message);
+      if (!data.session) { S.authMode = 'login'; render(); toast('Conta criada! Abra o link que enviamos ao seu e-mail para confirmar.'); }
     }
-    function logout() { S = { userId: null, churchId: null, view: 'app', tab: 'home', adminTab: 'overview', authMode: 'login', pix: { step: 'form', category: 'tithe', amount: 100 }, invite: S.invite }; save(); render(); scrollTo(0, 0); }
-    function joinChurch(e) {
+    async function doReset() {
+      const email = ($('l-email') || {}).value;
+      if (!email) return toast('Digite seu e-mail no campo acima.');
+      await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: location.origin + location.pathname });
+      toast('Se o e-mail estiver cadastrado, enviamos um link para criar nova senha.');
+    }
+    async function logout() { if (sb) await sb.auth.signOut(); }
+    async function joinChurch(e) {
       e.preventDefault();
       const code = $('j-code').value.trim().toLowerCase().replace(/.*igreja=/, '').replace(/[^a-z0-9]/g, '');
+      let st; try { st = await q(sb.rpc('join_church', { p_slug: code })); } catch (err) { return; }
+      S.invite = null; history.replaceState(null, '', location.pathname);
+      await reload();
       const c = db.churches.find(x => x.slug === code);
-      if (!c) return toast('Código não encontrado. Confira com a secretaria.');
-      let m = db.memberships.find(x => x.userId === S.userId && x.churchId === c.id);
-      S.churchId = c.id;
-      if (!m) {
-        m = { id: uid('m'), churchId: c.id, userId: S.userId, role: 'member', status: c.joinMode === 'open' ? 'active' : 'pending', ministry: '' };
-        db.memberships.push(m);
-        log(m.status === 'active' ? `${me().name} entrou na igreja pelo link` : `${me().name} pediu para entrar na igreja`);
-      }
-      S.invite = null; S.tab = 'home';
-      save(); render(); toast(m.status === 'active' ? 'Bem-vindo(a)!' : 'Pedido enviado à secretaria.');
+      if (c) { S.churchId = c.id; S.tab = 'home'; save(); await reload(); }
+      toast(st === 'active' ? 'Bem-vindo(a)!' : 'Pedido enviado à secretaria.');
     }
-    function createChurch(e) {
+    async function createChurch(e) {
       e.preventDefault();
       const name = $('n-name').value.trim(); if (!name) return toast('Informe o nome da igreja.');
-      const base = clean(name).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) || 'igreja';
-      let slug = base, i = 2; while (db.churches.some(c => c.slug === slug)) slug = base + (i++);
-      const profile = $('n-prof').value;
-      const c = { id: uid('c'), slug, name, cnpj: $('n-cnpj').value.trim(), city: $('n-city').value.trim() || 'Brasil', pixKey: $('n-pix').value.trim(), profile, dailyMessage: PROFILES[profile].verse, joinMode: 'approval', plan: 'Teste grátis' };
-      db.churches.push(c);
-      db.memberships.push({ id: uid('m'), churchId: c.id, userId: S.userId, role: 'admin', status: 'active', ministry: 'Pastoral' });
-      S.churchId = c.id; S.view = 'admin'; S.adminTab = 'members';
-      log('Igreja criada no Comunidade+');
-      save(); render(); toast('Igreja criada! Agora compartilhe o link de convite.');
+      let base = clean(name).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20); if (base.length < 3) base += 'igreja';
+      const args = { p_name: name, p_profile: $('n-prof').value, p_cnpj: $('n-cnpj').value.trim(), p_city: $('n-city').value.trim() || 'Brasil', p_pix_key: $('n-pix').value.trim() };
+      let id = null;
+      for (let i = 1; i < 30 && !id; i++) {
+        const { data, error } = await sb.rpc('create_church', { ...args, p_slug: i === 1 ? base : base + i });
+        if (!error) id = data; else if (!/duplicate|unique/i.test(error.message)) return toast('Erro: ' + error.message);
+      }
+      if (!id) return toast('Não foi possível criar a igreja.');
+      S.invite = null; S.churchId = id; S.view = 'admin'; S.adminTab = 'members'; save();
+      await reload(); toast('Igreja criada! Agora compartilhe o link de convite.');
     }
-    function switchChurch(id) { S.churchId = id; S.view = 'app'; S.tab = 'home'; S.pix = { step: 'form', category: 'tithe', amount: 100 }; save(); render(); }
-    function switchView(v) { S.view = v; if (v === 'admin' && !ROLES[role()].tabs.includes(S.adminTab)) S.adminTab = ROLES[role()].tabs[0]; save(); render(); scrollTo(0, 0); }
-    function setTab(x) { S.tab = x; if (x === 'give' && S.pix.step === 'done') S.pix.step = 'form'; save(); render(); scrollTo(0, 0); }
-    function setAdminTab(x) { S.adminTab = x; save(); render(); scrollTo(0, 0); }
+    function switchChurch(id) { S.churchId = id; S.invite = null; S.view = 'app'; S.tab = 'home'; S.pix = { step: 'form', category: 'tithe', amount: 100 }; save(); S.loading = true; render(); reload(); }
+    function switchView(v) { S.view = v; if (v === 'admin' && !ROLES[role()].tabs.includes(S.adminTab)) S.adminTab = ROLES[role()].tabs[0]; render(); scrollTo(0, 0); }
+    function setTab(x) { S.tab = x; if (x === 'give' && S.pix.step === 'done') S.pix.step = 'form'; render(); scrollTo(0, 0); }
+    function setAdminTab(x) { S.adminTab = x; render(); scrollTo(0, 0); }
 
     const regCount = ev => ev.base + db.registrations.filter(r => r.eventId === ev.id).length;
     const isReg = ev => db.registrations.some(r => r.eventId === ev.id && r.userId === S.userId);
-    function toggleReg(id) {
+    async function toggleReg(id) {
       const ev = db.events.find(e => e.id === id); if (!ev) return;
-      if (isReg(ev)) { db.registrations = db.registrations.filter(r => !(r.eventId === id && r.userId === S.userId)); toast('Inscrição cancelada.'); }
-      else { if (regCount(ev) >= ev.spots) return toast('Vagas esgotadas.'); db.registrations.push({ eventId: id, userId: S.userId }); log(`${me().name} se inscreveu em "${ev.title}"`); toast('Presença confirmada!'); }
-      save(); render();
+      if (isReg(ev)) return run(() => q(sb.from('registrations').delete().eq('event_id', id).eq('user_id', S.userId)), 'Inscrição cancelada.');
+      if (regCount(ev) >= ev.spots) return toast('Vagas esgotadas.');
+      await run(async () => { await q(sb.from('registrations').insert({ event_id: id, user_id: S.userId })); await log(`${me().name} se inscreveu em "${ev.title}"`); }, 'Presença confirmada!');
     }
-    function pixCat(c) { S.pix.category = c; save(); render(); }
-    function pixAmt(v) { S.pix.amount = v; save(); render(); }
+    function pixCat(c) { S.pix.category = c; render(); }
+    function pixAmt(v) { S.pix.amount = v; render(); }
     function pixGen(e) {
       e.preventDefault();
       const a = Number($('pix-amt').value); if (!(a > 0)) return toast('Informe um valor válido.');
       const c = church(); if (!c.pixKey) return toast('A igreja ainda não cadastrou a chave Pix.');
       const txid = 'CMP' + Date.now().toString(36).toUpperCase().slice(-8);
       S.pix = { ...S.pix, step: 'qr', amount: a, txid, payload: brcode(c.pixKey, c.name, c.city, a, txid) };
-      save(); render(); scrollTo(0, 0);
+      render(); scrollTo(0, 0);
     }
-    function pixSent() {
-      const k = { id: uid('k'), churchId: S.churchId, userId: S.userId, category: S.pix.category, amount: S.pix.amount, status: 'pending_check', date: 'Hoje, ' + hhmm(), txid: S.pix.txid };
-      db.contributions.unshift(k);
-      log(`${me().name} informou Pix de ${money(k.amount)} (${t(k.category)})`);
-      S.pix.step = 'done'; S.pix.last = k.id;
-      save(); render(); toast('Tesouraria avisada!');
+    async function pixSent() {
+      const k = { church_id: S.churchId, user_id: S.userId, category: S.pix.category, amount: S.pix.amount, txid: S.pix.txid };
+      const ok = await run(async () => { const r = await q(sb.from('contributions').insert(k).select('id').single()); S.pix.last = r.id; await log(`${me().name} informou Pix de ${money(k.amount)} (${t(k.category)})`); }, 'Tesouraria avisada!');
+      if (ok) { S.pix.step = 'done'; render(); }
     }
-    function pixReset() { S.pix.step = 'form'; save(); render(); }
-    function sendPrayer(e) {
+    function pixReset() { S.pix.step = 'form'; render(); }
+    async function sendPrayer(e) {
       e.preventDefault();
       const text = $('pr-text').value.trim(); if (!text) return;
-      db.prayers.unshift({ id: uid('p'), churchId: S.churchId, userId: S.userId, anon: $('pr-anon').checked, text, isPrivate: $('pr-priv').checked, status: 'new', prayedBy: [], date: 'Hoje, ' + hhmm() });
-      log(`Novo ${t('prayer').toLowerCase()} recebido`);
-      save(); render(); toast('Pedido enviado!');
+      const row = { church_id: S.churchId, user_id: S.userId, anonymous: $('pr-anon').checked, is_private: $('pr-priv').checked, text };
+      await run(async () => { await q(sb.from('prayers').insert(row)); await log(`Novo ${t('prayer').toLowerCase()} recebido`); }, 'Pedido enviado!');
     }
-    function pray(id) { const p = db.prayers.find(x => x.id === id); if (!p) return; p.prayedBy = p.prayedBy.includes(S.userId) ? p.prayedBy.filter(u => u !== S.userId) : [...p.prayedBy, S.userId]; save(); render(); }
-    function schedStatus(id, st) { const s = db.schedules.find(x => x.id === id); if (!s) return; s.status = st; log(`${uname(s.userId)} ${st === 'confirmed' ? 'confirmou' : 'pediu troca em'} ${s.ministry}`); save(); render(); toast(st === 'confirmed' ? 'Escala confirmada!' : 'Troca solicitada à liderança.'); }
-
-    function memberAction(id, act) {
+    async function pray(id) {
+      const p = db.prayers.find(x => x.id === id); if (!p) return;
+      await run(() => p.prayedBy.includes(S.userId) ? q(sb.from('prayer_supports').delete().eq('prayer_id', id).eq('user_id', S.userId)) : q(sb.from('prayer_supports').insert({ prayer_id: id, user_id: S.userId })));
+    }
+    async function schedStatus(id, st) {
+      const s = db.schedules.find(x => x.id === id); if (!s) return;
+      await run(async () => { await q(sb.from('schedules').update({ status: st }).eq('id', id)); await log(`${uname(s.userId)} ${st === 'confirmed' ? 'confirmou' : 'pediu troca em'} ${s.ministry}`); }, st === 'confirmed' ? 'Escala confirmada!' : 'Troca solicitada à liderança.');
+    }
+    async function memberAction(id, act) {
       const m = db.memberships.find(x => x.id === id); if (!m) return;
-      if (act === 'approve') { m.status = 'active'; log(`${uname(m.userId)} foi aprovado(a)`); }
-      if (act === 'reject') { db.memberships = db.memberships.filter(x => x.id !== id); log(`Pedido de ${uname(m.userId)} recusado`); }
-      if (act === 'deactivate') { m.status = 'inactive'; log(`${uname(m.userId)} foi desativado(a)`); }
-      if (act === 'activate') m.status = 'active';
-      save(); render(); toast('Atualizado.');
+      const nm = uname(m.userId);
+      await run(async () => {
+        if (act === 'reject') await q(sb.from('memberships').delete().eq('id', id));
+        else await q(sb.from('memberships').update({ status: act === 'deactivate' ? 'inactive' : 'active' }).eq('id', id));
+        await log(act === 'approve' ? `${nm} foi aprovado(a)` : act === 'reject' ? `Pedido de ${nm} recusado` : act === 'deactivate' ? `${nm} foi desativado(a)` : `${nm} foi reativado(a)`);
+      }, 'Atualizado.');
     }
-    function memberRole(id, r) {
+    async function memberRole(id, r) {
       const m = db.memberships.find(x => x.id === id); if (!m) return;
-      if (m.role === 'admin' && r !== 'admin' && of('memberships').filter(x => x.role === 'admin' && x.status === 'active').length < 2) { toast('A igreja precisa de pelo menos um admin.'); render(); return; }
-      m.role = r; log(`${uname(m.userId)} agora é ${ROLES[r].label}`);
-      save(); render(); toast('Função alterada.');
+      const ok = await run(async () => { await q(sb.from('memberships').update({ role: r }).eq('id', id)); await log(`${uname(m.userId)} agora é ${ROLES[r].label}`); }, 'Função alterada.');
+      if (!ok) render();
     }
-    function memberMinistry(id, v) { const m = db.memberships.find(x => x.id === id); if (m) { m.ministry = v; save(); } }
+    async function memberMinistry(id, v) { await sb.from('memberships').update({ ministry: v }).eq('id', id); }
     function filterMembers() { document.querySelectorAll('.mrow').forEach(r => { r.style.display = r.dataset.q.includes(S.q || '') ? '' : 'none'; }); }
-    function addMember(e) {
-      e.preventDefault();
-      const name = $('am-name').value.trim(), em = $('am-email').value.trim().toLowerCase(); if (!name || !em) return;
-      let u = db.users.find(x => x.email.toLowerCase() === em);
-      if (!u) { u = { id: uid('u'), name, email: em, pass: '123456' }; db.users.push(u); }
-      if (db.memberships.some(m => m.userId === u.id && m.churchId === S.churchId)) return toast('Essa pessoa já está na igreja.');
-      db.memberships.push({ id: uid('m'), churchId: S.churchId, userId: u.id, role: 'member', status: 'active', ministry: $('am-min').value.trim() });
-      log(`${name} cadastrado(a) pela secretaria`);
-      save(); render(); toast('Membro cadastrado (senha provisória 123456).');
+    async function confirmPix(id) {
+      const k = db.contributions.find(x => x.id === id); if (!k) return;
+      await run(async () => { await q(sb.from('contributions').update({ status: 'confirmed' }).eq('id', id)); await log(`Tesouraria confirmou Pix de ${uname(k.userId)} — ${money(k.amount)}`); }, 'Baixa registrada!');
     }
-    function confirmPix(id) { const k = db.contributions.find(x => x.id === id); if (!k) return; k.status = 'confirmed'; log(`Tesouraria confirmou Pix de ${uname(k.userId)} — ${money(k.amount)}`); save(); render(); toast('Baixa registrada!'); }
-    function addAnn(e) {
+    async function addAnn(e) {
       e.preventDefault();
-      const title = $('an-t').value.trim(), body = $('an-b').value.trim(); if (!title || !body) return;
-      db.announcements.unshift({ id: uid('a'), churchId: S.churchId, title, body, tag: $('an-g').value, date: 'Hoje, ' + hhmm() });
-      log(`Novo aviso: ${title}`); save(); render(); toast('Aviso publicado no app!');
+      const title = $('an-t').value.trim(), body = $('an-b').value.trim(), tag = $('an-g').value; if (!title || !body) return;
+      await run(async () => { await q(sb.from('announcements').insert({ church_id: S.churchId, title, body, tag, created_by: S.userId })); await log(`Novo aviso: ${title}`); }, 'Aviso publicado no app!');
     }
-    function addEv(e) {
+    async function addEv(e) {
       e.preventDefault();
       const title = $('ev-t').value.trim(), date = $('ev-d').value.trim(); if (!title || !date) return;
-      db.events.unshift({ id: uid('e'), churchId: S.churchId, title, date, location: $('ev-l').value.trim() || 'Templo', spots: Number($('ev-s').value) || 100, base: 0 });
-      log(`Novo evento: ${title}`); save(); render(); toast('Evento publicado no app!');
+      const row = { church_id: S.churchId, title, date_label: date, location: $('ev-l').value.trim() || 'Templo', spots: Number($('ev-s').value) || 100 };
+      await run(async () => { await q(sb.from('events').insert(row)); await log(`Novo evento: ${title}`); }, 'Evento publicado no app!');
     }
-    function del(list, id) { db[list] = db[list].filter(x => x.id !== id); save(); render(); toast('Excluído.'); }
-    function prayerStatus(id, st) { const p = db.prayers.find(x => x.id === id); if (p) { p.status = st; save(); render(); toast('Atualizado.'); } }
-    function addSched(e) {
+    async function del(list, id) { if (!['announcements', 'events', 'schedules'].includes(list)) return; await run(() => q(sb.from(list).delete().eq('id', id)), 'Excluído.'); }
+    async function prayerStatus(id, st) { await run(() => q(sb.from('prayers').update({ status: st }).eq('id', id)), 'Atualizado.'); }
+    async function addSched(e) {
       e.preventDefault();
       const userId = $('sc-u').value, ev = $('sc-e').value.trim(), min = $('sc-m').value.trim(); if (!userId || !ev || !min) return;
-      db.schedules.push({ id: uid('s'), churchId: S.churchId, userId, event: ev, ministry: min, status: 'pending' });
-      log(`Escala criada: ${min} — ${uname(userId)}`); save(); render(); toast('Voluntário escalado!');
+      await run(async () => { await q(sb.from('schedules').insert({ church_id: S.churchId, user_id: userId, event_label: ev, ministry: min })); await log(`Escala criada: ${min} — ${uname(userId)}`); }, 'Voluntário escalado!');
     }
-    function saveSettings(e) {
+    async function saveSettings(e) {
       e.preventDefault();
-      const c = church();
-      ['name', 'cnpj', 'city', 'pixKey', 'dailyMessage'].forEach(k => { const v = $('st-' + k).value.trim(); if (v) c[k] = v; });
-      c.joinMode = $('st-join').value;
-      save(); render(); toast('Configurações salvas!');
+      const v = k => $('st-' + k).value.trim(), c = church();
+      await run(() => q(sb.from('churches').update({ name: v('name') || c.name, cnpj: v('cnpj'), city: v('city'), pix_key: v('pixKey'), daily_message: v('dailyMessage') || null, join_mode: $('st-join').value }).eq('id', S.churchId)), 'Configurações salvas!');
     }
-    function setProfile(p) { const c = church(); if (c.dailyMessage === PROFILES[c.profile].verse) c.dailyMessage = PROFILES[p].verse; c.profile = p; save(); render(); toast('Vocabulário: ' + PROFILES[p].label); }
-    function setPlan(id, p) { const c = db.churches.find(x => x.id === id); if (c) { c.plan = p; save(); render(); toast('Plano atualizado.'); } }
+    async function setProfile(p) {
+      const c = church(), upd = { profile: p };
+      if (c.dailyMessage === PROFILES[c.profile].verse) upd.daily_message = null;
+      await run(() => q(sb.from('churches').update(upd).eq('id', S.churchId)), 'Vocabulário: ' + PROFILES[p].label);
+    }
+    async function setPlan(id, p) { await run(() => q(sb.from('churches').update({ plan: PLAN_DB[p] }).eq('id', id)), 'Plano atualizado.'); }
     const inviteLink = c => location.origin + location.pathname + '?igreja=' + c.slug;
-    function resetDemo() { localStorage.removeItem(DB_KEY); sessionStorage.removeItem(SS_KEY); location.href = location.pathname; }
+    function resetDemo() { location.href = 'demo.html'; }
+
+    if (sb) {
+      sb.auth.onAuthStateChange((ev, session) => {
+        if (ev === 'PASSWORD_RECOVERY') setTimeout(() => { const np = prompt('Digite sua nova senha (mín. 6 caracteres):'); if (np && np.length >= 6) sb.auth.updateUser({ password: np }).then(() => toast('Senha alterada!')); }, 300);
+        const id = session ? session.user.id : null;
+        if (!id) { S.userId = null; S.loading = false; db.memberships = []; db.users = []; if (chan) { sb.removeChannel(chan); chan = null; } render(); return; }
+        if (id === S.userId) return;
+        S.userId = id; S.loading = true; S.view = 'app'; render();
+        setTimeout(() => reload().then(() => { if (me() && me().isSuper && !db.memberships.some(m => m.userId === S.userId)) { S.view = 'super'; render(); } }), 0);
+      });
+      if (S.invite) sb.rpc('church_public_info', { p_slug: S.invite }).then(({ data }) => { if (data && data[0]) { S.inviteName = data[0].name; render(); } });
+    }
 
     function renderAuth() {
-      const inv = S.invite && db.churches.find(c => c.slug === S.invite);
+      const inv = S.inviteName ? { name: S.inviteName } : null;
       const demo = [['u_pr', 'Pastor (admin)', 'Igreja Vida Nova'], ['u_tes', 'Tesouraria', 'Igreja Vida Nova'], ['u_lid', 'Líder de louvor', 'Igreja Vida Nova'], ['u_fiel', 'Fiel', 'Igreja Vida Nova'], ['u_ana', 'Fiel aguardando aprovação', 'Igreja Vida Nova'], ['u_padre', 'Padre (admin)', 'Paróquia São José'], ['u_super', 'Dono da plataforma', 'Comunidade+']];
       const login = S.authMode === 'login';
       return `<div class="min-h-screen max-w-md mx-auto px-5 py-8 safe-t space-y-5">
@@ -331,10 +396,7 @@
           ${login ? `<form onsubmit="doLogin(event)" class="space-y-3"><input id="l-email" type="email" required placeholder="E-mail" class="${INP}" /><input id="l-pass" type="password" required placeholder="Senha" class="${INP}" /><button class="${BTN}">Entrar</button></form>`
           : `<form onsubmit="doSignup(event)" class="space-y-3"><input id="s-name" required placeholder="Seu nome completo" class="${INP}" /><input id="s-email" type="email" required placeholder="E-mail" class="${INP}" /><input id="s-pass" type="password" required minlength="6" placeholder="Crie uma senha (mín. 6)" class="${INP}" /><button class="${BTN}">Criar conta</button></form>`}
         </div>
-        <div class="space-y-2"><div class="text-xs font-bold uppercase tracking-wider text-slate-500 px-1">Demonstração — entrar como</div>
-          <div class="grid grid-cols-2 gap-2">${demo.map(([id, l, c]) => `<button onclick="enterAs('${id}')" class="text-left p-3 rounded-xl bg-white border border-slate-200 hover:border-indigo-300"><div class="text-xs font-bold">${l}</div><div class="text-[11px] text-slate-500">${c}</div></button>`).join('')}</div>
-          <p class="text-[11px] text-slate-400 px-1">Protótipo de demonstração: os dados ficam salvos só neste aparelho. Senha das contas de exemplo: 123456.</p>
-        </div>
+        <div class="text-center space-y-3"><button onclick="doReset()" class="text-xs font-semibold text-indigo-600">Esqueci minha senha</button><div><a href="demo.html" class="text-xs text-slate-500 underline">Ver demonstração com dados de exemplo</a></div></div>
       </div>`;
     }
 
@@ -355,7 +417,7 @@
 
     function renderPending(c, st) {
       const inact = st === 'inactive';
-      return `<div class="min-h-screen max-w-md mx-auto px-5 py-10 safe-t text-center space-y-4"><div class="w-16 h-16 rounded-full ${inact ? 'bg-slate-100' : 'bg-amber-100'} flex items-center justify-center mx-auto text-2xl">${inact ? '🔒' : '⏳'}</div><h2 class="text-lg font-bold">${inact ? 'Acesso inativo' : 'Aguardando aprovação'}</h2><p class="text-sm text-slate-500">${inact ? `Seu acesso a <b>${esc(c.name)}</b> está inativo. Fale com a secretaria.` : `Seu pedido para entrar em <b>${esc(c.name)}</b> foi enviado. Assim que a secretaria aprovar, o app libera tudo.`}</p><button onclick="db=loadDB();render()" class="${BTN}">Verificar de novo</button><button onclick="S.churchId=null;save();render()" class="${BTN2}">Entrar em outra igreja</button><button onclick="logout()" class="text-xs text-slate-500 font-semibold">Sair</button></div>`;
+      return `<div class="min-h-screen max-w-md mx-auto px-5 py-10 safe-t text-center space-y-4"><div class="w-16 h-16 rounded-full ${inact ? 'bg-slate-100' : 'bg-amber-100'} flex items-center justify-center mx-auto text-2xl">${inact ? '🔒' : '⏳'}</div><h2 class="text-lg font-bold">${inact ? 'Acesso inativo' : 'Aguardando aprovação'}</h2><p class="text-sm text-slate-500">${inact ? `Seu acesso a <b>${esc(c.name)}</b> está inativo. Fale com a secretaria.` : `Seu pedido para entrar em <b>${esc(c.name)}</b> foi enviado. Assim que a secretaria aprovar, o app libera tudo.`}</p><button onclick="S.loading=true;render();reload()" class="${BTN}">Verificar de novo</button><button onclick="S.churchId=null;save();render()" class="${BTN2}">Entrar em outra igreja</button><button onclick="logout()" class="text-xs text-slate-500 font-semibold">Sair</button></div>`;
     }
     function renderBlocked(c) { return `<div class="min-h-screen max-w-md mx-auto px-5 py-10 safe-t text-center space-y-4"><div class="text-3xl">⛔</div><h2 class="text-lg font-bold">Assinatura suspensa</h2><p class="text-sm text-slate-500">O acesso de <b>${esc(c.name)}</b> ao Comunidade+ está suspenso. Fale com a administração da igreja.</p><button onclick="logout()" class="${BTN2}">Sair</button></div>`; }
 
@@ -419,7 +481,7 @@
       return `<div class="min-h-screen flex flex-col max-w-md mx-auto w-full md:shadow-xl md:border-x md:border-slate-200">
         <header class="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-100 px-4 pb-3 safe-t flex items-center justify-between gap-2">
           <div class="flex items-center gap-2.5 min-w-0"><div class="w-9 h-9 rounded-2xl hero text-white flex items-center justify-center font-bold text-xs shrink-0">${esc(initials(c.name))}</div><div class="min-w-0">${myCh.length > 1 ? `<select onchange="switchChurch(this.value)" class="font-bold text-sm bg-transparent max-w-[160px]">${myCh.map(m => { const x = db.churches.find(y => y.id === m.churchId); return x ? `<option value="${x.id}" ${x.id === c.id ? 'selected' : ''}>${esc(x.name)}</option>` : ''; }).join('')}</select>` : `<div class="font-bold text-sm truncate">${esc(c.name)}</div>`}<div class="text-[11px] text-slate-500">Olá, ${esc(u.name.split(' ')[0])}</div></div></div>
-          <div class="flex items-center gap-1.5 shrink-0">${isStaff() ? `<button onclick="switchView('admin')" class="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-bold">Painel Admin</button>` : ''}<button onclick="logout()" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-500 bg-slate-100">Sair</button></div>
+          <div class="flex items-center gap-1.5 shrink-0">${me().isSuper ? `<button onclick="S.view='super';render()" class="px-2.5 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold">Plataforma</button>` : ''}${isStaff() ? `<button onclick="switchView('admin')" class="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-bold">Painel Admin</button>` : ''}<button onclick="logout()" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-500 bg-slate-100">Sair</button></div>
         </header>
         <main class="flex-1 p-4 pb-28">${body}</main>
         <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 max-w-md w-full z-20 grid grid-cols-5 bg-white/95 backdrop-blur border-t border-slate-200 px-1 pt-1.5 safe-b">${nav.map(([id, l, ic]) => `<button onclick="setTab('${id}')" class="py-1.5 flex flex-col items-center gap-0.5 text-[11px] ${S.tab === id ? 'text-indigo-600 font-bold' : 'text-slate-400 font-medium'}"><span class="text-base leading-none">${ic}</span>${l}</button>`).join('')}</nav>
@@ -447,7 +509,7 @@
           <div class="${CARD} space-y-1"><div class="flex justify-between items-center gap-2 mb-1"><div class="font-bold text-sm">Membros (${listed.length})</div><input oninput="S.q=this.value.toLowerCase();filterMembers()" placeholder="Buscar..." class="text-xs px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 w-32" /></div>
             ${listed.map(m => { const u = db.users.find(x => x.id === m.userId) || {}; return `<div data-q="${esc((u.name + ' ' + u.email + ' ' + (m.ministry || '')).toLowerCase())}" class="mrow py-2.5 border-b border-slate-100 last:border-0 space-y-1.5"><div class="flex justify-between items-center gap-2"><div class="min-w-0"><div class="text-sm font-semibold truncate">${esc(u.name)}${m.userId === S.userId ? ' <span class="text-[10px] text-indigo-600">(você)</span>' : ''}</div><div class="text-[11px] text-slate-500 truncate">${esc(u.email)}</div></div>${badge(m.status)}</div><div class="flex flex-wrap items-center gap-2">${roleSel(m)}<input value="${esc(m.ministry)}" onchange="memberMinistry('${m.id}',this.value)" placeholder="${esc(t('ministry'))}" class="text-xs px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 w-28" />${m.userId !== S.userId ? `<button onclick="memberAction('${m.id}','${m.status === 'active' ? 'deactivate' : 'activate'}')" class="text-xs font-semibold ${m.status === 'active' ? 'text-rose-600' : 'text-emerald-700'}">${m.status === 'active' ? 'Desativar' : 'Reativar'}</button>` : ''}</div></div>`; }).join('')}
           </div>
-          <form onsubmit="addMember(event)" class="${CARD} space-y-2.5"><div class="font-bold text-sm">Cadastrar membro manualmente</div><input id="am-name" required placeholder="Nome" class="${INP}" /><input id="am-email" type="email" required placeholder="E-mail" class="${INP}" /><input id="am-min" placeholder="${esc(t('ministry'))} (opcional)" class="${INP}" /><button class="${BTN}">Cadastrar membro</button></form>
+          <div class="rounded-2xl bg-indigo-50 border border-indigo-100 p-3.5 text-xs text-indigo-900">Para adicionar alguém, envie o link de convite acima. A pessoa cria a própria conta e já entra na igreja.</div>
         </div>`;
       } else if (A === 'finance') {
         const total = ks.filter(k => k.status === 'confirmed').reduce((a, k) => a + k.amount, 0);
@@ -484,20 +546,23 @@
 
     function renderSuper() {
       const plans = ['Teste grátis', 'Essencial', 'Completo', 'Suspenso'];
-      return `<div class="min-h-screen max-w-2xl mx-auto"><header class="sticky top-0 z-20 bg-slate-900 text-white px-4 pb-3 safe-t flex justify-between items-center"><div><div class="font-bold text-sm">Comunidade+ • Plataforma</div><div class="text-[11px] text-slate-300">Visão do dono do SaaS</div></div><button onclick="logout()" class="px-3 py-1.5 rounded-xl bg-white/10 text-xs font-bold">Sair</button></header>
-        <main class="p-4 space-y-4"><div class="grid grid-cols-3 gap-3">${[['Igrejas', db.churches.length], ['Fiéis ativos', db.memberships.filter(m => m.status === 'active').length], ['Em teste', db.churches.filter(c => c.plan === 'Teste grátis').length]].map(([l, v]) => `<div class="rounded-2xl bg-white border border-slate-200 p-4"><div class="text-xs text-slate-500">${l}</div><div class="text-2xl font-extrabold mt-1">${v}</div></div>`).join('')}</div>
-        <div class="${CARD} space-y-1"><div class="font-bold text-sm mb-1">Igrejas clientes</div>${db.churches.map(c => { const ms = db.memberships.filter(m => m.churchId === c.id && m.status === 'active').length; return `<div class="py-2.5 border-b border-slate-100 last:border-0 flex justify-between items-center gap-2"><div class="min-w-0"><div class="text-sm font-semibold truncate">${esc(c.name)}</div><div class="text-[11px] text-slate-500">${esc(PROFILES[c.profile].label)} • ${esc(c.city)} • ${ms} membros • código ${esc(c.slug)}</div></div><select onchange="setPlan('${c.id}',this.value)" class="text-xs px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 shrink-0">${plans.map(p => `<option ${c.plan === p ? 'selected' : ''}>${p}</option>`).join('')}</select></div>`; }).join('')}</div>
+      const ov = db.overview || [];
+      return `<div class="min-h-screen max-w-2xl mx-auto"><header class="sticky top-0 z-20 bg-slate-900 text-white px-4 pb-3 safe-t flex justify-between items-center gap-2"><div><div class="font-bold text-sm">Comunidade+ • Plataforma</div><div class="text-[11px] text-slate-300">Visão do dono do SaaS</div></div><div class="flex gap-1.5">${db.memberships.some(m => m.userId === S.userId) ? `<button onclick="S.view='app';render()" class="px-3 py-1.5 rounded-xl bg-white/10 text-xs font-bold">Minha igreja</button>` : ''}<button onclick="logout()" class="px-3 py-1.5 rounded-xl bg-white/10 text-xs font-bold">Sair</button></div></header>
+        <main class="p-4 space-y-4"><div class="grid grid-cols-3 gap-3">${[['Igrejas', ov.length], ['Fiéis ativos', ov.reduce((a, c) => a + Number(c.active_members), 0)], ['Em teste', ov.filter(c => c.plan === 'trial').length]].map(([l, v]) => `<div class="rounded-2xl bg-white border border-slate-200 p-4"><div class="text-xs text-slate-500">${l}</div><div class="text-2xl font-extrabold mt-1">${v}</div></div>`).join('')}</div>
+        <div class="${CARD} space-y-1"><div class="font-bold text-sm mb-1">Igrejas clientes</div>${ov.map(c => `<div class="py-2.5 border-b border-slate-100 last:border-0 flex justify-between items-center gap-2"><div class="min-w-0"><div class="text-sm font-semibold truncate">${esc(c.name)}</div><div class="text-[11px] text-slate-500">${esc((PROFILES[c.profile] || {}).label)} • ${esc(c.city || '')} • ${c.active_members} membros • código ${esc(c.slug)}</div></div><select onchange="setPlan('${c.church_id}',this.value)" class="text-xs px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 shrink-0">${plans.map(p => `<option ${PLAN[c.plan] === p ? 'selected' : ''}>${p}</option>`).join('')}</select></div>`).join('') || empty('Nenhuma igreja cadastrada ainda.')}</div>
         <p class="text-[11px] text-slate-500 px-1">Por privacidade (LGPD), o dono da plataforma vê só os números de cada igreja, não os dados dos fiéis nem as contribuições. Mude o plano para "Suspenso" para bloquear uma igreja inadimplente.</p></main></div>`;
     }
 
     function render() {
       const r = $('root');
+      if (!sb) { r.innerHTML = `<div class="min-h-screen max-w-md mx-auto px-5 py-12 text-center space-y-4"><img src="icon.svg" class="w-16 h-16 mx-auto rounded-2xl" alt="" /><h1 class="text-xl font-extrabold">Comunidade+</h1><p class="text-sm text-slate-500">Falta conectar o banco de dados: preencha a chave pública do Supabase no arquivo <b>config.js</b>.</p><a href="demo.html" class="block ${BTN}">Abrir demonstração</a></div>`; return; }
+      if (S.loading) { r.innerHTML = '<div class="min-h-screen flex items-center justify-center"><div class="w-10 h-10 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin"></div></div>'; return; }
       if (!S.userId || !me()) { r.innerHTML = renderAuth(); return; }
       const u = me();
       if (u.isSuper && S.view === 'super') { r.innerHTML = renderSuper(); return; }
       if (S.invite) {
         const ic = db.churches.find(x => x.slug === S.invite);
-        if (ic && !db.memberships.some(m => m.userId === S.userId && m.churchId === ic.id)) { r.innerHTML = renderOnboarding(); return; }
+        if (!ic || !db.memberships.some(m => m.userId === S.userId && m.churchId === ic.id)) { r.innerHTML = renderOnboarding(); return; }
         S.invite = null;
       }
       const c = church(), m = myMem();
