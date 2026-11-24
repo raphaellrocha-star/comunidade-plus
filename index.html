@@ -211,7 +211,7 @@
           db.events = evs.map(e => ({ id: e.id, churchId: cid, title: e.title, date: e.date_label || '', location: e.location || '', spots: e.spots, base: (counts[e.id] || 0) - db.registrations.filter(r => r.eventId === e.id).length }));
           db.schedules = sch.map(s => ({ id: s.id, churchId: cid, userId: s.user_id, event: s.event_label, ministry: s.ministry, status: s.status }));
           db.prayers = prs.map(p => ({ id: p.id, churchId: cid, userId: p.user_id, anon: !p.user_id, text: p.text, isPrivate: p.is_private, status: p.status, prayedBy: sup.filter(s => s.prayer_id === p.id).map(s => s.user_id), date: when(p.created_at) }));
-          db.contributions = ks.map(k => ({ id: k.id, churchId: cid, userId: k.user_id, category: k.category, amount: Number(k.amount), status: k.status, date: when(k.created_at), txid: k.txid }));
+          db.contributions = ks.map(k => ({ id: k.id, churchId: cid, userId: k.user_id, category: k.category, amount: Number(k.amount), status: k.status, date: when(k.created_at), at: k.created_at, txid: k.txid }));
           db.activity = act.map(l => ({ id: l.id, churchId: cid, time: when(l.created_at), text: l.text }));
         }
         db.overview = (me() && me().isSuper) ? await q(sb.rpc('platform_overview')) : [];
@@ -488,6 +488,8 @@
       </div>`;
     }
 
+    function finMonth(n) { const F = S.fm; F.m += n; if (F.m < 0) { F.m = 11; F.y--; } if (F.m > 11) { F.m = 0; F.y++; } F.d = null; render(); }
+    function finDay(d) { S.fm.d = S.fm.d === d ? null : d; render(); }
     function renderAdmin() {
       const c = church(), tabs = ROLES[role()].tabs;
       if (!tabs.includes(S.adminTab)) S.adminTab = tabs[0];
@@ -513,11 +515,31 @@
           <div class="rounded-2xl bg-indigo-50 border border-indigo-100 p-3.5 text-xs text-indigo-900">Para adicionar alguém, envie o link de convite acima. A pessoa cria a própria conta e já entra na igreja.</div>
         </div>`;
       } else if (A === 'finance') {
-        const total = ks.filter(k => k.status === 'confirmed').reduce((a, k) => a + k.amount, 0);
-        const byCat = ['tithe', 'offering', 'missions'].map(k => [t(k), ks.filter(x => x.category === k && x.status === 'confirmed').reduce((a, x) => a + x.amount, 0)]);
-        body = `<div class="space-y-3"><div class="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 space-y-1"><div class="text-xs text-emerald-800 font-semibold">Pix direto • taxa R$ 0,00</div><div class="text-2xl font-extrabold text-emerald-900">${money(total)}</div><div class="text-[11px] text-emerald-800">confirmado no extrato • chave <span class="font-mono">${esc(c.pixKey)}</span></div><div class="grid grid-cols-3 gap-2 pt-2">${byCat.map(([l, v]) => `<div class="bg-white/70 rounded-xl p-2"><div class="text-[10px] text-emerald-800">${esc(l)}</div><div class="text-xs font-bold text-emerald-900">${money(v)}</div></div>`).join('')}</div></div>
-          <p class="text-[11px] text-slate-500 px-1">O dinheiro cai direto na conta da igreja. Confira o extrato do banco e dê baixa nos avisos dos fiéis.</p>
-          ${ks.map(k => `<div class="${CARD} flex justify-between items-center gap-2"><div class="min-w-0"><div class="font-bold text-sm truncate">${esc(uname(k.userId))}</div><div class="text-xs text-slate-500">${esc(t(k.category))} • ${esc(k.date)}</div><div class="text-[10px] text-slate-400 font-mono">ID ${esc(k.txid || '')}</div><div class="mt-1">${badge(k.status)}</div></div><div class="text-right space-y-1.5 shrink-0"><div class="font-extrabold text-sm text-emerald-700">${money(k.amount)}</div>${k.status === 'pending_check' ? `<button onclick="confirmPix('${k.id}')" class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold">Confirmar ✓</button>` : ''}</div></div>`).join('') || empty('Nenhuma contribuição ainda.')}</div>`;
+        const now = new Date(); if (!S.fm) S.fm = { y: now.getFullYear(), m: now.getMonth(), d: null };
+        const F = S.fm, MES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+        const dt = k => new Date(k.at || Date.now());
+        const inM = ks.filter(k => { const d = dt(k); return d.getFullYear() === F.y && d.getMonth() === F.m; });
+        const conf = inM.filter(k => k.status === 'confirmed'), sum = a => a.reduce((x, k) => x + k.amount, 0);
+        const total = sum(conf), pendM = sum(inM.filter(k => k.status === 'pending_check'));
+        const pm = F.m ? [F.y, F.m - 1] : [F.y - 1, 11];
+        const prev = sum(ks.filter(k => { const d = dt(k); return k.status === 'confirmed' && d.getFullYear() === pm[0] && d.getMonth() === pm[1]; }));
+        const diff = prev ? Math.round((total - prev) / prev * 100) : null;
+        const byCat = ['tithe', 'offering', 'missions'].map(k => [t(k), sum(conf.filter(x => x.category === k))]);
+        const perDay = {}; inM.forEach(k => { const d = dt(k).getDate(); perDay[d] = (perDay[d] || 0) + k.amount; });
+        const maxD = Math.max(1, ...Object.values(perDay)), first = new Date(F.y, F.m, 1).getDay(), nd = new Date(F.y, F.m + 1, 0).getDate();
+        const isToday = d => now.getFullYear() === F.y && now.getMonth() === F.m && now.getDate() === d;
+        const short = v => v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 0 : 1).replace('.', ',') + 'k' : Math.round(v);
+        let cal = ''; for (let i = 0; i < first; i++) cal += '<div></div>';
+        for (let d = 1; d <= nd; d++) { const v = perDay[d], op = v ? 0.15 + 0.6 * v / maxD : 0;
+          cal += `<button onclick="finDay(${d})" class="aspect-square rounded-xl flex flex-col items-center justify-center text-xs transition ${F.d === d ? 'ring-2 ring-indigo-600' : ''} ${isToday(d) ? 'font-extrabold text-indigo-700' : 'text-slate-700'}" style="background:${v ? `rgba(16,185,129,${op})` : '#F8FAFC'}"><span>${d}</span>${v ? `<span class="text-[9px] font-bold text-emerald-900 leading-none mt-0.5">${short(v)}</span>` : ''}</button>`; }
+        const list = F.d ? inM.filter(k => dt(k).getDate() === F.d) : inM;
+        body = `<div class="space-y-4">
+          <div class="flex items-center justify-between ${CARD} !py-2.5"><button onclick="finMonth(-1)" class="w-9 h-9 rounded-xl bg-slate-100 font-bold active:scale-95">‹</button><div class="text-center"><div class="font-extrabold">${MES[F.m]} ${F.y}</div><div class="text-[11px] text-slate-500">${inM.length} contribuições no mês</div></div><button onclick="finMonth(1)" class="w-9 h-9 rounded-xl bg-slate-100 font-bold active:scale-95">›</button></div>
+          <div class="rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white p-5 shadow-lg space-y-1"><div class="text-xs text-emerald-50 font-semibold">Confirmado em ${MES[F.m].toLowerCase()} • Pix taxa R$ 0,00</div><div class="text-3xl font-extrabold tracking-tight">${money(total)}</div><div class="text-[11px] text-emerald-50">${diff === null ? 'sem dados do mês anterior' : (diff >= 0 ? '▲ ' : '▼ ') + Math.abs(diff) + '% vs mês anterior (' + money(prev) + ')'}${pendM ? ' • ' + money(pendM) + ' a conferir' : ''}</div><div class="grid grid-cols-3 gap-2 pt-3">${byCat.map(([l, v]) => `<div class="bg-white/15 rounded-xl p-2"><div class="text-[10px] text-emerald-50">${esc(l)}</div><div class="text-xs font-bold">${money(v)}</div></div>`).join('')}</div></div>
+          <div class="${CARD} space-y-2"><div class="flex justify-between items-center"><div class="font-bold text-sm">Calendário de entradas</div>${F.d ? `<button onclick="finDay(null)" class="text-xs text-indigo-600 font-semibold">Ver mês todo</button>` : ''}</div><div class="grid grid-cols-7 gap-1 text-[10px] text-center text-slate-400 font-semibold">${['D','S','T','Q','Q','S','S'].map(x => `<div>${x}</div>`).join('')}</div><div class="grid grid-cols-7 gap-1">${cal}</div><div class="text-[10px] text-slate-400">Toque num dia para ver as contribuições. Quanto mais verde, maior o valor.</div></div>
+          <div class="flex justify-between items-center px-1"><div class="font-bold text-sm">${F.d ? `Dia ${F.d}` : 'Contribuições do mês'}</div><div class="text-xs text-slate-500">chave <span class="font-mono">${esc(c.pixKey || '—')}</span></div></div>
+          ${list.map(k => `<div class="${CARD} flex justify-between items-center gap-2"><div class="min-w-0"><div class="font-bold text-sm truncate">${esc(uname(k.userId))}</div><div class="text-xs text-slate-500">${esc(t(k.category))} • ${esc(k.date)}</div><div class="text-[10px] text-slate-400 font-mono">ID ${esc(k.txid || '')}</div><div class="mt-1">${badge(k.status)}</div></div><div class="text-right space-y-1.5 shrink-0"><div class="font-extrabold text-sm text-emerald-700">${money(k.amount)}</div>${k.status === 'pending_check' ? `<button onclick="confirmPix('${k.id}')" class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold">Confirmar ✓</button>` : ''}</div></div>`).join('') || empty(F.d ? 'Nada neste dia.' : 'Nenhuma contribuição neste mês.')}
+          <p class="text-[11px] text-slate-500 px-1">O dinheiro cai direto na conta da igreja. Confira o extrato do banco e dê baixa nos avisos dos fiéis.</p></div>`;
       } else if (A === 'content') {
         body = `<div class="space-y-4">
           <form onsubmit="addAnn(event)" class="${CARD} space-y-2.5"><div class="font-bold text-sm">Publicar aviso</div><input id="an-t" required placeholder="Título" class="${INP}" /><textarea id="an-b" rows="2" required placeholder="Mensagem" class="${INP}"></textarea><div class="flex gap-2"><select id="an-g" class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm"><option>Importante</option><option>Aviso Geral</option><option>Ação Social</option><option>Jovens</option></select><button class="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold">Publicar</button></div></form>
