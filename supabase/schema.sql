@@ -25,6 +25,7 @@ create table public.churches (
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   name text not null,
+  email text,
   is_platform_admin boolean not null default false,
   created_at timestamptz not null default now()
 );
@@ -146,7 +147,7 @@ $$;
 create or replace function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  insert into profiles (id, name) values (new.id, coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)));
+  insert into profiles (id, name, email) values (new.id, coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)), new.email);
   return new;
 end $$;
 create trigger on_auth_user_created after insert on auth.users
@@ -266,9 +267,12 @@ create policy church_platform on public.churches for update using (public.is_pla
 
 -- Perfis: cada um ve o seu e o de quem esta nas mesmas igrejas
 create policy profile_self on public.profiles for select using (id = auth.uid());
-create policy profile_same_church on public.profiles for select using (
-  exists (select 1 from memberships a join memberships b on a.church_id = b.church_id
-          where a.user_id = auth.uid() and a.status = 'active' and b.user_id = profiles.id));
+create or replace function public.shares_church(other uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from memberships a join memberships b on a.church_id = b.church_id
+                 where a.user_id = auth.uid() and a.status = 'active' and b.user_id = other)
+$$;
+create policy profile_same_church on public.profiles for select using (public.shares_church(id));
 create policy profile_update_self on public.profiles for update using (id = auth.uid()) with check (id = auth.uid() and is_platform_admin = false);
 
 -- Membros
@@ -319,3 +323,26 @@ create policy log_insert on public.activity_log for insert with check (public.is
 
 -- Tempo real: o app atualiza sozinho quando algo muda
 alter publication supabase_realtime add table public.announcements, public.events, public.memberships, public.contributions, public.prayers, public.schedules;
+
+-- Vagas: total de inscritos por evento (sem expor quem se inscreveu)
+create or replace function public.event_counts(c uuid)
+returns table (event_id uuid, total bigint)
+language sql stable security definer set search_path = public as $$
+  select e.id, count(r.user_id) from events e left join registrations r on r.event_id = e.id
+  where e.church_id = c and public.is_member(c) group by e.id
+$$;
+
+-- Nome das igrejas do usuario (inclusive quando ainda aguarda aprovacao)
+create or replace function public.my_church_names()
+returns table (id uuid, name text, slug text)
+language sql stable security definer set search_path = public as $$
+  select c.id, c.name, c.slug from churches c join memberships m on m.church_id = c.id where m.user_id = auth.uid()
+$$;
+
+-- Acesso pela API (as regras RLS acima continuam valendo)
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+grant execute on all functions in schema public to authenticated;
+revoke execute on all functions in schema public from anon;
+grant execute on function public.church_public_info(text) to anon;
